@@ -15,3 +15,12 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+    lib/
+    ├── main.dart
+    ├── utils/
+    │ └── validators.dart // 表单正则校验
+    ├── pages/
+    │ ├── splash_page.dart // 欢迎加载页
+    │ ├── login_page.dart // 登录页
+    │ └── register_page.dart // 注册页
