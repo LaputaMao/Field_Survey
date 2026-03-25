@@ -14,6 +14,21 @@ class HomeScreen extends StatefulWidget {
   _HomeScreenState createState() => _HomeScreenState();
 }
 
+// 1. 新增两个实体类，用于存储解析出的线和点以及它们的 properties（把它放在 _HomeScreenState 类的上面）
+class TaskLine {
+  final List<LatLng> points;
+  final Map<String, dynamic> properties;
+
+  TaskLine({required this.points, required this.properties});
+}
+
+class TaskPoint {
+  final LatLng location;
+  final Map<String, dynamic> properties;
+
+  TaskPoint({required this.location, required this.properties});
+}
+
 class _HomeScreenState extends State<HomeScreen> {
   final MapController _mapController = MapController();
 
@@ -22,18 +37,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _currentTaskTitle = "请从右侧菜单选择任务";
 
-  // 模拟当前选中的任务路线（将来由上一个页面或后端传入 GeoJSON 解析出来）
-  List<LatLng> _plannedRoute = [];
-  List<Marker> _surveyMarkers = []; // 调查点
+  // 2. 在 _HomeScreenState 内部，新增两个列表存放解析后的数据
+  List<TaskLine> _taskLines = [];
+  List<TaskPoint> _taskPoints = [];
+
+  // 路线与点位存储
+  List<LatLng> _actualRoute = []; // 实际走过的绿色轨迹
+  List<Map<String, dynamic>> _actualPoints = []; // 实际打的点
 
   // 状态控制
   bool _isSurveying = false; // 是否在调查中
   LatLng? _currentLocation; // 手机实时GPS位置
   StreamSubscription<Position>? _positionStream; // 轨迹监听流
-
-  // 路线与点位存储
-  List<LatLng> _actualRoute = []; // 实际走过的绿色轨迹
-  List<Map<String, dynamic>> _actualPoints = []; // 实际打的点
 
   @override
   void initState() {
@@ -88,7 +103,99 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // ============== 核心逻辑：开始调查与结束调查 ==============
+  // 3. 重写 _loadTaskToMap 方法处理 GeoJSON
+  void _loadTaskToMap(Map<String, dynamic> result) {
+    final taskInfo = result['task_info'];
+    final geojson = result['geojson'];
+
+    List<TaskLine> parsedLines = [];
+    List<TaskPoint> parsedPoints = [];
+    List<LatLng> allCoordinatesForBounding = []; // 用于计算地图缩放视野
+
+    if (geojson['type'] == 'FeatureCollection' && geojson['features'] != null) {
+      for (var feature in geojson['features']) {
+        final geometry = feature['geometry'];
+        final properties = feature['properties'] ?? {};
+
+        if (geometry['type'] == 'LineString') {
+          List<LatLng> lineCoords = [];
+          for (var coord in geometry['coordinates']) {
+            // GeoJSON 格式是 [Lon, Lat]，所以 coord[1] 是纬度，coord[0] 是经度
+            LatLng ll = LatLng(coord[1], coord[0]);
+            lineCoords.add(ll);
+            allCoordinatesForBounding.add(ll);
+          }
+          parsedLines.add(TaskLine(points: lineCoords, properties: properties));
+        } else if (geometry['type'] == 'Point') {
+          var coord = geometry['coordinates'];
+          LatLng ll = LatLng(coord[1], coord[0]);
+          parsedPoints.add(TaskPoint(location: ll, properties: properties));
+          allCoordinatesForBounding.add(ll);
+        }
+      }
+    }
+
+    setState(() {
+      _taskLines = parsedLines;
+      _taskPoints = parsedPoints;
+      _currentTaskTitle = "执行任务: #${taskInfo['id']} (${taskInfo['status']})";
+    });
+
+    // ========== 核心：视角自动缩放以包含所有规划路线 ==========
+    if (allCoordinatesForBounding.isNotEmpty) {
+      // 根据所有点计算地图的边界范围 (Bounding Box)
+      final bounds = LatLngBounds.fromPoints(allCoordinatesForBounding);
+
+      // flutter_map 6.x 控制视角缩放的方法 (增加了一些 Padding 防止点贴在屏幕边缘)
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: EdgeInsets.all(50.0), // 四周留出 50 像素空隙
+        ),
+      );
+    }
+  }
+
+  // 4. 重写显示 Properties 弹窗的方法
+  void _showPropertiesSheet(Map<String, dynamic> properties, String type) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "[$type] 详情信息",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 15),
+              // 动态遍历 properties 里的所有键值对并展示
+              ...properties.entries
+                  .map(
+                    (entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        "${entry.key}: ${entry.value}",
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ============== 开始调查与结束调查 ==============
   Future<void> _startSurvey() async {
     // 1. 请求定位权限
     LocationPermission permission = await Geolocator.requestPermission();
@@ -144,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ============== 核心逻辑：打点填表 (底部弹窗) ==============
+  // ============== 打点填表 (底部弹窗) ==============
   void _openSurveyForm({Map<String, dynamic>? existingPoint, int? pointIndex}) {
     if (_currentLocation == null && existingPoint == null) {
       ScaffoldMessenger.of(
@@ -420,7 +527,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
                 // 3. 接收返回的路线数据，绘制在地图上
                 if (result != null) {
-                  // _loadTaskToMap(result);
+                  _loadTaskToMap(result);
                 }
               },
             ),
@@ -447,9 +554,27 @@ class _HomeScreenState extends State<HomeScreen> {
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              center: LatLng(30.2741, 120.1551),
-              zoom: 15.0,
+              center: LatLng(39.910428, 116.397357),
+              zoom: 14.0,
               maxZoom: 18.0,
+              onTap: (tapPosition, LatLng clickedLatLng) {
+                // 当我们点击地图空白处时，咱们循环判断这下点击离哪条线最近
+                for (var taskLine in _taskLines) {
+                  for (var point in taskLine.points) {
+                    // 粗略判断经纬度差（实战中可用 _distance() 计算精确米数）
+                    double distance = Distance().as(
+                      LengthUnit.Meter,
+                      clickedLatLng,
+                      point,
+                    );
+                    if (distance < 2000) {
+                      // 50米容差范围
+                      _showPropertiesSheet(taskLine.properties, "规划路线");
+                      return;
+                    }
+                  }
+                }
+              },
             ),
             children: [
               // 天地图矢量底图 (需把你的tk替换掉末尾的 YOUR_TK)
@@ -458,22 +583,6 @@ class _HomeScreenState extends State<HomeScreen> {
               //       'http://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
               //   userAgentPackageName: 'com.LaputaMao.field_survey',
               // ),
-              // 1. 高德卫星纯影像底图图层
-              TileLayer(
-                urlTemplate:
-                    'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
-                subdomains: const ['1', '2', '3', '4'],
-                userAgentPackageName: 'com.LaputaMao.field_survey',
-              ),
-              // 2. 高德路网及地名标签图层 (透明背景盖在卫星图上)
-              TileLayer(
-                urlTemplate:
-                    'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8',
-                subdomains: const ['1', '2', '3', '4'],
-                backgroundColor: Colors.transparent, // 必须透明
-                userAgentPackageName: 'com.LaputaMao.field_survey',
-              ),
-
               // 天地图矢量注记图层（文字地名，通常盖在底图上面一层）
               // TileLayer(
               //   urlTemplate:
@@ -481,7 +590,57 @@ class _HomeScreenState extends State<HomeScreen> {
               //   backgroundColor: Colors.transparent, // 背景透明，只盖文字
               //   userAgentPackageName: 'com.LaputaMao.field_survey',
               // ),
-              // 实际行走的绿色轨迹
+              TileLayer(
+                // 1. 高德卫星纯影像底图图层
+                urlTemplate:
+                    'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
+                subdomains: const ['1', '2', '3', '4'],
+                userAgentPackageName: 'com.LaputaMao.field_survey',
+              ),
+
+              TileLayer(
+                // 2. 高德路网及地名标签图层 (透明背景盖在卫星图上)
+                urlTemplate:
+                    'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8',
+                subdomains: const ['1', '2', '3', '4'],
+                backgroundColor: Colors.transparent, // 必须透明
+                userAgentPackageName: 'com.LaputaMao.field_survey',
+              ),
+
+              // --------------- 渲染 GeoJSON 的多段线 ---------------
+              PolylineLayer(
+                polylines: _taskLines.map((taskLine) {
+                  return Polyline(
+                    points: taskLine.points,
+                    strokeWidth: 4.0,
+                    color: Colors.blueAccent.withOpacity(0.8),
+                  );
+                }).toList(),
+              ),
+
+              // --------------- 渲染 GeoJSON 规划的点位 ---------------
+              MarkerLayer(
+                markers: _taskPoints.map((taskPoint) {
+                  return Marker(
+                    point: taskPoint.location,
+                    width: 45,
+                    height: 45,
+                    child: GestureDetector(
+                      onTap: () {
+                        // 点击规划点，展示后端派发的 properties
+                        _showPropertiesSheet(taskPoint.properties, "规划调查点");
+                      },
+                      child: const Icon(
+                        Icons.place,
+                        color: Colors.purple,
+                        size: 40,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+
+              // ---------------实际行走的绿色轨迹---------------
               PolylineLayer(
                 polylines: [
                   Polyline(
@@ -492,7 +651,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
 
-              // 实际打卡的点位 (使用显眼的橙色/深绿)
+              // ---------------实际打卡的点位 (使用显眼的橙色/深绿)---------------
               MarkerLayer(
                 markers: _actualPoints.asMap().entries.map((entry) {
                   int index = entry.key;
