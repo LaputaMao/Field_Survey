@@ -42,3 +42,7 @@ android {
 flutter {
     source = "../.."
 }
+
+// 查看SHA1指纹:
+// keytool -v -list -keystore "C:\Users\Y9000\.android\debug.keystore"
+// 密码:android

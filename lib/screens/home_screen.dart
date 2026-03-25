@@ -453,19 +453,34 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             children: [
               // 天地图矢量底图 (需把你的tk替换掉末尾的 YOUR_TK)
+              // TileLayer(
+              //   urlTemplate:
+              //       'http://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
+              //   userAgentPackageName: 'com.LaputaMao.field_survey',
+              // ),
+              // 1. 高德卫星纯影像底图图层
               TileLayer(
                 urlTemplate:
-                    'http://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
+                    'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
+                subdomains: const ['1', '2', '3', '4'],
+                userAgentPackageName: 'com.LaputaMao.field_survey',
+              ),
+              // 2. 高德路网及地名标签图层 (透明背景盖在卫星图上)
+              TileLayer(
+                urlTemplate:
+                    'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8',
+                subdomains: const ['1', '2', '3', '4'],
+                backgroundColor: Colors.transparent, // 必须透明
                 userAgentPackageName: 'com.LaputaMao.field_survey',
               ),
 
               // 天地图矢量注记图层（文字地名，通常盖在底图上面一层）
-              TileLayer(
-                urlTemplate:
-                    'http://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
-                backgroundColor: Colors.transparent, // 背景透明，只盖文字
-                userAgentPackageName: 'com.LaputaMao.field_survey',
-              ),
+              // TileLayer(
+              //   urlTemplate:
+              //       'http://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
+              //   backgroundColor: Colors.transparent, // 背景透明，只盖文字
+              //   userAgentPackageName: 'com.LaputaMao.field_survey',
+              // ),
               // 实际行走的绿色轨迹
               PolylineLayer(
                 polylines: [

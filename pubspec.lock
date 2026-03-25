@@ -65,6 +65,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
+  coordtransform:
+    dependency: "direct main"
+    description:
+      name: coordtransform
+      sha256: "1c527323224b4a5b16d102b53f1fec7c4f5fbd4e265058d89ed37f7f3b3d6c38"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.2"
   cross_file:
     dependency: transitive
     description:
