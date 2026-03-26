@@ -8,6 +8,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dotted_border/dotted_border.dart';
 import '../widgets/hold_to_complete_button.dart'; // 引入咱们刚写的长按按钮
+import 'package:coordtransform/coordtransform.dart' as coordtransform;
+import 'package:amap_core/amap_core.dart' as yu hide LatLng, MapOptions;
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -40,6 +42,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // 2. 在 _HomeScreenState 内部，新增两个列表存放解析后的数据
   List<TaskLine> _taskLines = [];
   List<TaskPoint> _taskPoints = [];
+
+  // 新增：记录当前用户选中的线路
+  TaskLine? _selectedLine;
 
   // 路线与点位存储
   List<LatLng> _actualRoute = []; // 实际走过的绿色轨迹
@@ -103,6 +108,27 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // --- 新增：GPS(WGS84) 转 高德(GCJ-02) ---
+  LatLng _wgsToGcj(LatLng wgs84) {
+    // // coordtransform 格式：[lon, lat]
+    // // todo 修改成 GCJ02
+    // final gcjList = coordtransform.CoordTransform.transformWGS84toGCJ02(
+    //   wgs84.longitude,
+    //   wgs84.latitude,
+    // );
+    // return LatLng(gcjList.lat, gcjList.lon); // 转回 LatLng(lat, lon)
+    return wgs84;
+  }
+
+  // (可选拓展) 高德(GCJ-02) 转 GPS(WGS84)，比如想把地图点击获取的坐标反转存库时用
+  LatLng _gcjToWgs(LatLng gcj02) {
+    final wgsList = coordtransform.CoordTransform.transformGCJ02toWGS84(
+      gcj02.longitude,
+      gcj02.latitude,
+    );
+    return LatLng(wgsList.lat, wgsList.lon);
+  }
+
   // 3. 重写 _loadTaskToMap 方法处理 GeoJSON
   void _loadTaskToMap(Map<String, dynamic> result) {
     final taskInfo = result['task_info'];
@@ -141,11 +167,13 @@ class _HomeScreenState extends State<HomeScreen> {
       _currentTaskTitle = "执行任务: #${taskInfo['id']} (${taskInfo['status']})";
     });
 
-    // ========== 核心：视角自动缩放以包含所有规划路线 ==========
+    // 修改：为了在加载任务时精确将画面缩放到包含所有要素，边界计算也应使用 GCJ02
     if (allCoordinatesForBounding.isNotEmpty) {
-      // 根据所有点计算地图的边界范围 (Bounding Box)
-      final bounds = LatLngBounds.fromPoints(allCoordinatesForBounding);
-
+      // 把所有的 WGS84 临时转成 GCJ 算边界123123
+      final gcjBoundsCoordinates = allCoordinatesForBounding
+          .map((p) => _wgsToGcj(p))
+          .toList();
+      final bounds = LatLngBounds.fromPoints(gcjBoundsCoordinates);
       // flutter_map 6.x 控制视角缩放的方法 (增加了一些 Padding 防止点贴在屏幕边缘)
       _mapController.fitCamera(
         CameraFit.bounds(
@@ -551,134 +579,210 @@ class _HomeScreenState extends State<HomeScreen> {
       // ================= 核心：地图引擎部分 =================
       body: Stack(
         children: [
+          // 1. 地图层
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
-              center: LatLng(39.910428, 116.397357),
-              zoom: 14.0,
-              maxZoom: 18.0,
-              onTap: (tapPosition, LatLng clickedLatLng) {
-                // 当我们点击地图空白处时，咱们循环判断这下点击离哪条线最近
+              center: LatLng(30.2741, 120.1551), // 默认
+              zoom: 15.0,
+              // 点击地图空白处，计算距离并选中路线
+              onTap: (tapPosition, LatLng clickedLatLngGcj) {
+                // 注意：由于底层是高德，点击获取的坐标自带 GCJ-02 偏移！
+                TaskLine? closestLine;
+                double minDistance = double.infinity;
+
                 for (var taskLine in _taskLines) {
-                  for (var point in taskLine.points) {
-                    // 粗略判断经纬度差（实战中可用 _distance() 计算精确米数）
+                  for (var wgsPoint in taskLine.points) {
+                    // 我们要把后台真实的 WGS84 路线点 转换成 GCJ02 再去比较距离
+                    LatLng gcjPoint = _wgsToGcj(wgsPoint);
                     double distance = Distance().as(
                       LengthUnit.Meter,
-                      clickedLatLng,
-                      point,
+                      clickedLatLngGcj,
+                      gcjPoint,
                     );
-                    if (distance < 2000) {
-                      // 50米容差范围
-                      _showPropertiesSheet(taskLine.properties, "规划路线");
-                      return;
+                    if (distance < 50 && distance < minDistance) {
+                      // 50米容差
+                      minDistance = distance;
+                      closestLine = taskLine;
                     }
                   }
                 }
+
+                setState(() {
+                  _selectedLine = closestLine; // 若没点中，就是 null，卡片消失
+                });
               },
             ),
             children: [
-              // 天地图矢量底图 (需把你的tk替换掉末尾的 YOUR_TK)
-              // TileLayer(
-              //   urlTemplate:
-              //       'http://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
-              //   userAgentPackageName: 'com.LaputaMao.field_survey',
-              // ),
-              // 天地图矢量注记图层（文字地名，通常盖在底图上面一层）
-              // TileLayer(
-              //   urlTemplate:
-              //       'http://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
-              //   backgroundColor: Colors.transparent, // 背景透明，只盖文字
-              //   userAgentPackageName: 'com.LaputaMao.field_survey',
-              // ),
+              //天地图矢量底图 (需把你的tk替换掉末尾的 YOUR_TK)
               TileLayer(
-                // 1. 高德卫星纯影像底图图层
                 urlTemplate:
-                    'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}',
-                subdomains: const ['1', '2', '3', '4'],
+                    'http://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
+                userAgentPackageName: 'com.LaputaMao.field_survey',
+              ),
+              //天地图矢量注记图层（文字地名，通常盖在底图上面一层）
+              TileLayer(
+                urlTemplate:
+                    'http://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
+                backgroundColor: Colors.transparent, // 背景透明，只盖文字
                 userAgentPackageName: 'com.LaputaMao.field_survey',
               ),
 
-              TileLayer(
-                // 2. 高德路网及地名标签图层 (透明背景盖在卫星图上)
-                urlTemplate:
-                    'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8',
-                subdomains: const ['1', '2', '3', '4'],
-                backgroundColor: Colors.transparent, // 必须透明
-                userAgentPackageName: 'com.LaputaMao.field_survey',
-              ),
+              // // todo 切换成高德
+              // TileLayer(
+              //   // 1. 高德卫星纯影像底图图层
+              //   urlTemplate:
+              //       'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}&key=2f0fcf7450f5ef55cf109244f76c3235',
+              //   subdomains: const ['1', '2', '3', '4'],
+              //   userAgentPackageName: 'com.LaputaMao.field_survey',
+              // ),
+              //
+              // TileLayer(
+              //   // 2. 高德路网及地名标签图层 (透明背景盖在卫星图上)
+              //   urlTemplate:
+              //       'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8&key=2f0fcf7450f5ef55cf109244f76c3235',
+              //   subdomains: const ['1', '2', '3', '4'],
+              //   backgroundColor: Colors.transparent, // 必须透明
+              //   userAgentPackageName: 'com.LaputaMao.field_survey',
+              // ),
 
               // --------------- 渲染 GeoJSON 的多段线 ---------------
               PolylineLayer(
                 polylines: _taskLines.map((taskLine) {
+                  bool isSelected = (_selectedLine == taskLine);
+                  // 遍历路线，视图层实时 _wgsToGcj 转换
+                  final gcjPoints = taskLine.points
+                      .map((p) => _wgsToGcj(p))
+                      .toList();
+
                   return Polyline(
-                    points: taskLine.points,
-                    strokeWidth: 4.0,
-                    color: Colors.blueAccent.withOpacity(0.8),
+                    points: gcjPoints,
+                    strokeWidth: isSelected ? 6.0 : 4.0, // 选中加粗
+                    color: isSelected
+                        ? Colors.yellowAccent
+                        : Colors.blueAccent.withOpacity(0.8), // 选中高亮黄
                   );
                 }).toList(),
               ),
 
               // --------------- 渲染 GeoJSON 规划的点位 ---------------
-              MarkerLayer(
-                markers: _taskPoints.map((taskPoint) {
-                  return Marker(
-                    point: taskPoint.location,
-                    width: 45,
-                    height: 45,
-                    child: GestureDetector(
-                      onTap: () {
-                        // 点击规划点，展示后端派发的 properties
-                        _showPropertiesSheet(taskPoint.properties, "规划调查点");
-                      },
-                      child: const Icon(
-                        Icons.place,
-                        color: Colors.purple,
-                        size: 40,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
+              // MarkerLayer(
+              //   markers: _taskPoints.map((taskPoint) {
+              //     return Marker(
+              //       point: taskPoint.location,
+              //       width: 45,
+              //       height: 45,
+              //       child: GestureDetector(
+              //         onTap: () {
+              //           // 点击规划点，展示后端派发的 properties
+              //           _showPropertiesSheet(taskPoint.properties, "规划调查点");
+              //         },
+              //         child: const Icon(
+              //           Icons.place,
+              //           color: Colors.purple,
+              //           size: 40,
+              //         ),
+              //       ),
+              //     );
+              //   }).toList(),
+              // ),
 
               // ---------------实际行走的绿色轨迹---------------
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    points: _actualRoute,
+                    // 同样，用户的实际轨迹也是 WGS84，渲染到高德图上时要转 GCJ02
+                    points: _actualRoute.map((p) => _wgsToGcj(p)).toList(),
                     strokeWidth: 5.0,
                     color: Colors.green,
                   ),
                 ],
               ),
-
               // ---------------实际打卡的点位 (使用显眼的橙色/深绿)---------------
+              // MarkerLayer(
+              //   markers: _actualPoints.asMap().entries.map((entry) {
+              //     int index = entry.key;
+              //     Map<String, dynamic> pt = entry.value;
+              //     return Marker(
+              //       point: pt['location'],
+              //       width: 45,
+              //       height: 45,
+              //       child: GestureDetector(
+              //         onTap: () =>
+              //             _openSurveyForm(existingPoint: pt, pointIndex: index),
+              //         child: const Icon(
+              //           Icons.where_to_vote,
+              //           color: Colors.orange,
+              //           size: 40,
+              //         ),
+              //       ),
+              //     );
+              //   }).toList(),
+              // ),
+              //
+              // // 用户实时的当前GPS小蓝点指示
+              // if (_currentLocation != null)
+              //   MarkerLayer(
+              //     markers: [
+              //       Marker(
+              //         point: _currentLocation!,
+              //         width: 20,
+              //         height: 20,
+              //         child: Container(
+              //           decoration: BoxDecoration(
+              //             color: Colors.blueAccent,
+              //             shape: BoxShape.circle,
+              //             border: Border.all(color: Colors.white, width: 2),
+              //           ),
+              //         ),
+              //       ),
+              //     ],
+              //   ),
               MarkerLayer(
-                markers: _actualPoints.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  Map<String, dynamic> pt = entry.value;
-                  return Marker(
-                    point: pt['location'],
-                    width: 45,
-                    height: 45,
-                    child: GestureDetector(
-                      onTap: () =>
-                          _openSurveyForm(existingPoint: pt, pointIndex: index),
-                      child: const Icon(
-                        Icons.where_to_vote,
-                        color: Colors.orange,
-                        size: 40,
+                markers: [
+                  // 1. 展现尚未调查的规划打点
+                  ..._taskPoints.map(
+                    (taskPoint) => Marker(
+                      point: _wgsToGcj(taskPoint.location), // 转 GCJ
+                      width: 45,
+                      height: 45,
+                      child: GestureDetector(
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("请选中关联的路线后开始调查")),
+                          );
+                        },
+                        child: Icon(
+                          Icons.place,
+                          color: Colors.purple,
+                          size: 40,
+                        ),
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
-
-              // 用户实时的当前GPS小蓝点指示
-              if (_currentLocation != null)
-                MarkerLayer(
-                  markers: [
+                  ),
+                  // 2. 真实打卡点(你在填表存库时存的是WGS84, _actualPoints 内提取 location 转 GCJ)
+                  ..._actualPoints.asMap().entries.map(
+                    (entry) => Marker(
+                      point: _wgsToGcj(entry.value['location']), // 转 GCJ
+                      width: 45,
+                      height: 45,
+                      child: GestureDetector(
+                        onTap: () => _openSurveyForm(
+                          existingPoint: entry.value,
+                          pointIndex: entry.key,
+                        ),
+                        child: Icon(
+                          Icons.where_to_vote,
+                          color: Colors.orange,
+                          size: 40,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // 3. 当前实时 GPS 小蓝点
+                  if (_currentLocation != null)
                     Marker(
-                      point: _currentLocation!,
+                      point: _wgsToGcj(_currentLocation!), // 转 GCJ
                       width: 20,
                       height: 20,
                       child: Container(
@@ -689,12 +793,102 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                  ],
-                ),
+                ],
+              ),
             ],
           ),
 
           // 右下角的悬浮按钮组
+          // Positioned(
+          //   bottom: 30,
+          //   right: 20,
+          //   child: Column(
+          //     mainAxisSize: MainAxisSize.min,
+          //     crossAxisAlignment: CrossAxisAlignment.end,
+          //     children: [
+          //       // 解锁的打点按钮（只有surveying为true才显示出橘色打点按钮）
+          //       if (_isSurveying) ...[
+          //         FloatingActionButton(
+          //           heroTag: "mark_btn",
+          //           backgroundColor: Colors.orange,
+          //           onPressed: () => _openSurveyForm(),
+          //           child: Icon(Icons.add_location_alt, size: 30),
+          //         ),
+          //         SizedBox(height: 20), // 按钮间距
+          //       ],
+          //
+          //       // 核心控制按钮 (未开始: 绿色开始按键; 进行中: 红色长按结束健)
+          //       _isSurveying
+          //           ? HoldToCompleteButton(onCompleted: _endSurvey) // 调用自定义长按按钮
+          //           : FloatingActionButton.extended(
+          //               heroTag: "start_btn",
+          //               backgroundColor: Colors.green,
+          //               onPressed: _startSurvey,
+          //               icon: Icon(Icons.play_arrow),
+          //               label: Text(
+          //                 "开始调查",
+          //                 style: TextStyle(fontWeight: FontWeight.bold),
+          //               ),
+          //             ),
+          //     ],
+          //   ),
+          // ),
+          // 2. 顶部悬浮属性卡片（不遮挡和变暗地图）
+          if (_selectedLine != null && !_isSurveying)
+            Positioned(
+              top: 50, // 距离顶部安全区往下一点
+              left: 20,
+              right: 20,
+              child: Card(
+                elevation: 8,
+                shadowColor: Colors.black45,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(15),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "已选定路线详情",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[800],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => setState(() => _selectedLine = null),
+                            // 右上角关闭按钮
+                            child: Icon(Icons.close, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      Divider(),
+                      // 动态展示该线的 properties
+                      ..._selectedLine!.properties.entries
+                          .map(
+                            (entry) => Padding(
+                              padding: EdgeInsets.only(bottom: 6.0),
+                              child: Text(
+                                "${entry.key}: ${entry.value}",
+                                style: TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // 3. 右下角的悬浮按钮组 (修改了“开始按钮”属性)
           Positioned(
             bottom: 30,
             right: 20,
@@ -702,7 +896,6 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // 解锁的打点按钮（只有surveying为true才显示出橘色打点按钮）
                 if (_isSurveying) ...[
                   FloatingActionButton(
                     heroTag: "mark_btn",
@@ -710,16 +903,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPressed: () => _openSurveyForm(),
                     child: Icon(Icons.add_location_alt, size: 30),
                   ),
-                  SizedBox(height: 20), // 按钮间距
+                  SizedBox(height: 20),
                 ],
 
-                // 核心控制按钮 (未开始: 绿色开始按键; 进行中: 红色长按结束健)
                 _isSurveying
-                    ? HoldToCompleteButton(onCompleted: _endSurvey) // 调用自定义长按按钮
+                    ? HoldToCompleteButton(onCompleted: _endSurvey)
                     : FloatingActionButton.extended(
                         heroTag: "start_btn",
-                        backgroundColor: Colors.green,
-                        onPressed: _startSurvey,
+                        // 若未选择线，按钮置灰
+                        backgroundColor: _selectedLine == null
+                            ? Colors.grey
+                            : Colors.green,
+                        onPressed: () {
+                          if (_selectedLine == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("请先点击地图选择一条红色的规划路线")),
+                            );
+                            return; // 拒绝开始
+                          }
+                          _startSurvey(); // 开始调查
+                        },
                         icon: Icon(Icons.play_arrow),
                         label: Text(
                           "开始调查",
