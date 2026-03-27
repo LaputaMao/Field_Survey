@@ -17,7 +17,7 @@
     <application
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:label="环探助手">
+        android:label="野外调查APP">
         <!--        android:usesCleartextTraffic="true">-->
         <activity
             android:name=".MainActivity"

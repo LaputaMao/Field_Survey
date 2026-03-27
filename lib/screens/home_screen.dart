@@ -7,9 +7,15 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dotted_border/dotted_border.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/hold_to_complete_button.dart'; // 引入咱们刚写的长按按钮
 import 'package:coordtransform/coordtransform.dart' as coordtransform;
-import 'package:amap_core/amap_core.dart' as yu hide LatLng, MapOptions;
+
+// import 'package:amap_core/amap_core.dart' as yu hide LatLng, MapOptions;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'login_screen.dart'; // 引入你的登录页面
+
+import 'field_survey_form_page.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -62,6 +68,66 @@ class _HomeScreenState extends State<HomeScreen> {
     _initCurrentLocation();
   }
 
+  // ================= 退出登录逻辑：弹窗提示 =================
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('退出登录'),
+            ],
+          ),
+          content: Text(
+            _isSurveying
+                ? '您当前正在执行调查任务！此时退出登录将丢失所有未上传的轨迹和点位数据，确定要退出吗？'
+                : '确定要退出当前账号吗？',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // 关闭弹窗
+              child: Text('取消', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () async {
+                Navigator.of(context).pop(); // 先关闭弹窗
+                await _performLogout(); // 执行彻底清理
+              },
+              child: Text('确定退出', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ================= 退出登录逻辑：清理与跳转 =================
+  Future<void> _performLogout() async {
+    // 1. 关闭可能正在运行的 GPS 监听流，防止内存泄漏和后台异常崩溃
+    _positionStream?.cancel();
+
+    // 2. 清理 SharedPreferences 中的 Token 和其他用户信息
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove('jwt_token');
+    // 如果你本地还存了诸如 user_id, 角色等也可以一并 remove:
+    // await prefs.remove('user_id');
+
+    // 3. 销毁当前所有的路由栈，并把 LoginScreen 作为新的唯一根节点
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => LoginScreen()),
+        (Route<dynamic> route) => false, // return false 表示连根拔起，统统销毁
+      );
+    }
+  }
+
   // ============== 新增逻辑：进入地图自动定位 ==============
   Future<void> _initCurrentLocation() async {
     // 1. 检查手机 GPS 服务是否开启
@@ -110,13 +176,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- 新增：GPS(WGS84) 转 高德(GCJ-02) ---
   LatLng _wgsToGcj(LatLng wgs84) {
-    // // coordtransform 格式：[lon, lat]
-    // // todo 修改成 GCJ02
-    // final gcjList = coordtransform.CoordTransform.transformWGS84toGCJ02(
-    //   wgs84.longitude,
-    //   wgs84.latitude,
-    // );
-    // return LatLng(gcjList.lat, gcjList.lon); // 转回 LatLng(lat, lon)
+    // coordtransform 格式：[lon, lat]
+    // todo 修改成 GCJ02
+    // todo 注意! 模拟器中的GPS(小蓝点,绿色轨迹都没有转wgs84,因为好像模拟器就是GCJ02),后续记得统一
+    final gcjList = coordtransform.CoordTransform.transformWGS84toGCJ02(
+      wgs84.longitude,
+      wgs84.latitude,
+    );
+    return LatLng(gcjList.lat, gcjList.lon); // 转回 LatLng(lat, lon)
     return wgs84;
   }
 
@@ -171,7 +238,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (allCoordinatesForBounding.isNotEmpty) {
       // 把所有的 WGS84 临时转成 GCJ 算边界123123
       final gcjBoundsCoordinates = allCoordinatesForBounding
-          .map((p) => _wgsToGcj(p))
+           .map((p) => _wgsToGcj(p))
+          // .map((p) => p)
           .toList();
       final bounds = LatLngBounds.fromPoints(gcjBoundsCoordinates);
       // flutter_map 6.x 控制视角缩放的方法 (增加了一些 Padding 防止点贴在屏幕边缘)
@@ -280,221 +348,310 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ============== 打点填表 (底部弹窗) ==============
-  void _openSurveyForm({Map<String, dynamic>? existingPoint, int? pointIndex}) {
-    if (_currentLocation == null && existingPoint == null) {
+  // void _openSurveyForm({Map<String, dynamic>? existingPoint, int? pointIndex}) {
+  //   if (_currentLocation == null && existingPoint == null) {
+  //     ScaffoldMessenger.of(
+  //       context,
+  //     ).showSnackBar(SnackBar(content: Text("GPS信号弱，请稍后再试")));
+  //     return;
+  //   }
+  //
+  //   // 表单控制器与照片列表
+  //   TextEditingController descController = TextEditingController(
+  //     text: existingPoint?['desc'] ?? '',
+  //   );
+  //   List<String> photos = existingPoint != null
+  //       ? List<String>.from(existingPoint['photos'])
+  //       : [];
+  //
+  //   showModalBottomSheet(
+  //     context: context,
+  //     isScrollControlled: true, // 允许弹窗被键盘顶起
+  //     shape: RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  //     ),
+  //     builder: (context) {
+  //       // 使用 StatefulBuilder 为了在弹窗内刷新照片列表
+  //       return StatefulBuilder(
+  //         builder: (BuildContext context, StateSetter setModalState) {
+  //           // 拍照方法
+  //           Future<void> _takePhoto() async {
+  //             final ImagePicker _picker = ImagePicker();
+  //             final XFile? image = await _picker.pickImage(
+  //               source: ImageSource.camera,
+  //             );
+  //             if (image != null) {
+  //               setModalState(() {
+  //                 photos.add(image.path); // 将本地图片路径加入列表
+  //               });
+  //             }
+  //           }
+  //
+  //           return Padding(
+  //             padding: EdgeInsets.only(
+  //               bottom: MediaQuery.of(context).viewInsets.bottom, // 防止键盘遮挡
+  //               left: 20,
+  //               right: 20,
+  //               top: 20,
+  //             ),
+  //             child: SingleChildScrollView(
+  //               child: Column(
+  //                 mainAxisSize: MainAxisSize.min,
+  //                 crossAxisAlignment: CrossAxisAlignment.start,
+  //                 children: [
+  //                   Text(
+  //                     existingPoint == null ? "新增调查点" : "查看/编辑调查点",
+  //                     style: TextStyle(
+  //                       fontSize: 20,
+  //                       fontWeight: FontWeight.bold,
+  //                     ),
+  //                   ),
+  //                   SizedBox(height: 10),
+  //                   // 仅显示GPS坐标（防作弊）
+  //                   Text(
+  //                     "打卡坐标：${existingPoint?['location']?.latitude ?? _currentLocation!.latitude}, ${existingPoint?['location']?.longitude ?? _currentLocation!.longitude}",
+  //                     style: TextStyle(color: Colors.grey),
+  //                   ),
+  //                   SizedBox(height: 15),
+  //                   TextField(
+  //                     controller: descController,
+  //                     maxLines: 3,
+  //                     decoration: InputDecoration(
+  //                       labelText: '环境描述与现场情况',
+  //                       border: OutlineInputBorder(),
+  //                     ),
+  //                   ),
+  //                   SizedBox(height: 15),
+  //
+  //                   // 照片区域
+  //                   Text("现场照片", style: TextStyle(fontWeight: FontWeight.bold)),
+  //                   SizedBox(height: 10),
+  //                   Container(
+  //                     height: 80,
+  //                     child: ListView(
+  //                       scrollDirection: Axis.horizontal,
+  //                       children: [
+  //                         // 1. 虚线拍照大按钮
+  //                         GestureDetector(
+  //                           onTap: _takePhoto,
+  //                           child: DottedBorder(
+  //                             color: Colors.grey,
+  //                             strokeWidth: 2,
+  //                             dashPattern: [6, 4], // 虚线长度
+  //                             child: Container(
+  //                               width: 80,
+  //                               height: 80,
+  //                               child: Center(
+  //                                 child: Icon(
+  //                                   Icons.add,
+  //                                   size: 40,
+  //                                   color: Colors.grey,
+  //                                 ),
+  //                               ),
+  //                             ),
+  //                           ),
+  //                         ),
+  //                         SizedBox(width: 10),
+  //
+  //                         // 2. 已拍好的照片快视图列阵
+  //                         ...photos.asMap().entries.map((entry) {
+  //                           int idx = entry.key;
+  //                           String path = entry.value;
+  //                           return Stack(
+  //                             children: [
+  //                               Container(
+  //                                 margin: EdgeInsets.only(right: 10),
+  //                                 width: 80,
+  //                                 height: 80, // 和虚线框等大
+  //                                 decoration: BoxDecoration(
+  //                                   border: Border.all(
+  //                                     color: Colors.grey.shade300,
+  //                                   ),
+  //                                   image: DecorationImage(
+  //                                     image: FileImage(File(path)),
+  //                                     fit: BoxFit.cover,
+  //                                   ),
+  //                                 ),
+  //                               ),
+  //                               // 右上角的删除小红点
+  //                               Positioned(
+  //                                 top: 0,
+  //                                 right: 10,
+  //                                 child: GestureDetector(
+  //                                   onTap: () {
+  //                                     setModalState(() => photos.removeAt(idx));
+  //                                   },
+  //                                   child: Container(
+  //                                     decoration: BoxDecoration(
+  //                                       color: Colors.red,
+  //                                       shape: BoxShape.circle,
+  //                                     ),
+  //                                     child: Icon(
+  //                                       Icons.close,
+  //                                       size: 18,
+  //                                       color: Colors.white,
+  //                                     ),
+  //                                   ),
+  //                                 ),
+  //                               ),
+  //                             ],
+  //                           );
+  //                         }).toList(),
+  //                       ],
+  //                     ),
+  //                   ),
+  //                   SizedBox(height: 20),
+  //
+  //                   // 底部按钮栏
+  //                   Row(
+  //                     children: [
+  //                       if (existingPoint != null) // 如果是查看模式，允许删除整个点位
+  //                         Expanded(
+  //                           child: OutlinedButton(
+  //                             style: OutlinedButton.styleFrom(
+  //                               foregroundColor: Colors.red,
+  //                             ),
+  //                             onPressed: () {
+  //                               setState(
+  //                                 () => _actualPoints.removeAt(pointIndex!),
+  //                               );
+  //                               Navigator.pop(context);
+  //                             },
+  //                             child: Text('删除打卡点'),
+  //                           ),
+  //                         ),
+  //                       if (existingPoint != null) SizedBox(width: 10),
+  //
+  //                       Expanded(
+  //                         flex: 2,
+  //                         child: ElevatedButton(
+  //                           style: ElevatedButton.styleFrom(
+  //                             backgroundColor: Colors.green,
+  //                           ),
+  //                           onPressed: () {
+  //                             // 保存逻辑
+  //                             final newData = {
+  //                               'location':
+  //                                   existingPoint?['location'] ??
+  //                                   _currentLocation,
+  //                               'desc': descController.text,
+  //                               'photos': photos,
+  //                             };
+  //                             setState(() {
+  //                               if (existingPoint == null) {
+  //                                 _actualPoints.add(newData); // 新增
+  //                               } else {
+  //                                 _actualPoints[pointIndex!] = newData; // 修改
+  //                               }
+  //                             });
+  //                             Navigator.pop(context); // 收起弹窗
+  //                           },
+  //                           child: Text(
+  //                             existingPoint == null ? '保存点位' : '更新保存',
+  //                             style: TextStyle(color: Colors.white),
+  //                           ),
+  //                         ),
+  //                       ),
+  //                     ],
+  //                   ),
+  //                   SizedBox(height: 20),
+  //                 ],
+  //               ),
+  //             ),
+  //           );
+  //         },
+  //       );
+  //     },
+  //   );
+  // }
+  // 改写：打点填表逻辑
+  void _openSurveyForm({
+    Map<String, dynamic>? existingPoint,
+    int? pointIndex,
+  }) async {
+    if (_currentLocation == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("GPS信号弱，请稍后再试")));
+      ).showSnackBar(SnackBar(content: Text("GPS信号弱，无法进行打卡")));
       return;
     }
 
-    // 表单控制器与照片列表
-    TextEditingController descController = TextEditingController(
-      text: existingPoint?['desc'] ?? '',
-    );
-    List<String> photos = existingPoint != null
-        ? List<String>.from(existingPoint['photos'])
-        : [];
-
-    showModalBottomSheet(
+    // 需求2：点击打点后，先弹出模板选择器
+    final String? selectedTemplate = await showModalBottomSheet<String>(
       context: context,
-      isScrollControlled: true, // 允许弹窗被键盘顶起
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) {
-        // 使用 StatefulBuilder 为了在弹窗内刷新照片列表
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            // 拍照方法
-            Future<void> _takePhoto() async {
-              final ImagePicker _picker = ImagePicker();
-              final XFile? image = await _picker.pickImage(
-                source: ImageSource.camera,
-              );
-              if (image != null) {
-                setModalState(() {
-                  photos.add(image.path); // 将本地图片路径加入列表
-                });
-              }
-            }
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom, // 防止键盘遮挡
-                left: 20,
-                right: 20,
-                top: 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      existingPoint == null ? "新增调查点" : "查看/编辑调查点",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    // 仅显示GPS坐标（防作弊）
-                    Text(
-                      "打卡坐标：${existingPoint?['location']?.latitude ?? _currentLocation!.latitude}, ${existingPoint?['location']?.longitude ?? _currentLocation!.longitude}",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    SizedBox(height: 15),
-                    TextField(
-                      controller: descController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        labelText: '环境描述与现场情况',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    SizedBox(height: 15),
-
-                    // 照片区域
-                    Text("现场照片", style: TextStyle(fontWeight: FontWeight.bold)),
-                    SizedBox(height: 10),
-                    Container(
-                      height: 80,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          // 1. 虚线拍照大按钮
-                          GestureDetector(
-                            onTap: _takePhoto,
-                            child: DottedBorder(
-                              color: Colors.grey,
-                              strokeWidth: 2,
-                              dashPattern: [6, 4], // 虚线长度
-                              child: Container(
-                                width: 80,
-                                height: 80,
-                                child: Center(
-                                  child: Icon(
-                                    Icons.add,
-                                    size: 40,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 10),
-
-                          // 2. 已拍好的照片快视图列阵
-                          ...photos.asMap().entries.map((entry) {
-                            int idx = entry.key;
-                            String path = entry.value;
-                            return Stack(
-                              children: [
-                                Container(
-                                  margin: EdgeInsets.only(right: 10),
-                                  width: 80,
-                                  height: 80, // 和虚线框等大
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: Colors.grey.shade300,
-                                    ),
-                                    image: DecorationImage(
-                                      image: FileImage(File(path)),
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
-                                // 右上角的删除小红点
-                                Positioned(
-                                  top: 0,
-                                  right: 10,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setModalState(() => photos.removeAt(idx));
-                                    },
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        Icons.close,
-                                        size: 18,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 20),
-
-                    // 底部按钮栏
-                    Row(
-                      children: [
-                        if (existingPoint != null) // 如果是查看模式，允许删除整个点位
-                          Expanded(
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.red,
-                              ),
-                              onPressed: () {
-                                setState(
-                                  () => _actualPoints.removeAt(pointIndex!),
-                                );
-                                Navigator.pop(context);
-                              },
-                              child: Text('删除打卡点'),
-                            ),
-                          ),
-                        if (existingPoint != null) SizedBox(width: 10),
-
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                            ),
-                            onPressed: () {
-                              // 保存逻辑
-                              final newData = {
-                                'location':
-                                    existingPoint?['location'] ??
-                                    _currentLocation,
-                                'desc': descController.text,
-                                'photos': photos,
-                              };
-                              setState(() {
-                                if (existingPoint == null) {
-                                  _actualPoints.add(newData); // 新增
-                                } else {
-                                  _actualPoints[pointIndex!] = newData; // 修改
-                                }
-                              });
-                              Navigator.pop(context); // 收起弹窗
-                            },
-                            child: Text(
-                              existingPoint == null ? '保存点位' : '更新保存',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                  ],
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  "请选择数据填报模板",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
-            );
-          },
+              Divider(height: 1),
+              ListTile(
+                leading: Icon(Icons.assignment, color: Colors.green),
+                title: Text('生态地质调查点记录表'),
+                onTap: () => Navigator.pop(context, '1'), // 传回代号1
+              ),
+              ListTile(
+                leading: Icon(Icons.route, color: Colors.blue),
+                title: Text('生态地质垂直剖面测量记录表'),
+                onTap: () => Navigator.pop(context, '2'),
+              ),
+              ListTile(
+                leading: Icon(Icons.place, color: Colors.orange),
+                title: Text('生态地质垂直剖面测量点林草调查表'),
+                onTap: () => Navigator.pop(context, '3'),
+              ),
+            ],
+          ),
         );
       },
     );
+    // 如果用户没选（点击空白处取消了），就结束
+    if (selectedTemplate == null) return;
+    // 假设未选择路线就不能打开，之前已经做了限制。这里提取选择的路线ID传给下个页面做“点号”关联
+    String routeId = _selectedLine?.properties['线路号'] ?? "UNKNOWN";
+
+    // 使用 Navigator.push 推出全屏表单，并等待表单页点击右上角“完成提交”后返回数据
+    final resultData = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true, // 加上这个属性，动画会从下往上弹出，像一个系统的全屏工作表
+        builder: (context) => FieldSurveyFormPage(
+          currentGps: _currentLocation!, // 将真实的GPS（WGS84）发给表单页面自动填进去
+          routeId: routeId,
+          templateType: selectedTemplate, // 将选中的模板类型传给表单页
+        ),
+      ),
+    );
+
+    // 如果用户填好了点完成回来了（不是点左上角的取消）
+    if (resultData != null) {
+      setState(() {
+        // 生成一个包含坐标和海量表据数据的新集合，压入地图的已打卡列表中
+        final newData = {
+          'location': existingPoint?['location'] ?? _currentLocation,
+          'form_data': resultData, // 这里保存了近50个字段的完整数据字典！
+        };
+
+        if (existingPoint == null) {
+          _actualPoints.add(newData); // 新增打点
+        } else {
+          _actualPoints[pointIndex!] = newData; // 修改打点
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("该点位调查数据已提交！"), backgroundColor: Colors.green),
+      );
+    }
   }
 
   @override
@@ -569,7 +726,10 @@ class _HomeScreenState extends State<HomeScreen> {
               leading: Icon(Icons.logout, color: Colors.red),
               title: Text('退出登录', style: TextStyle(color: Colors.red)),
               onTap: () {
-                // TODO: 清除 Token 并退回登录页
+                // 1. 先收起侧边栏抽屉
+                Navigator.pop(context);
+                // 2. 弹出确认对话框
+                _showLogoutDialog();
               },
             ),
           ],
@@ -595,12 +755,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   for (var wgsPoint in taskLine.points) {
                     // 我们要把后台真实的 WGS84 路线点 转换成 GCJ02 再去比较距离
                     LatLng gcjPoint = _wgsToGcj(wgsPoint);
+                    // LatLng gcjPoint = wgsPoint;
                     double distance = Distance().as(
                       LengthUnit.Meter,
                       clickedLatLngGcj,
                       gcjPoint,
                     );
-                    if (distance < 50 && distance < minDistance) {
+                    if (distance < 1000 && distance < minDistance) {
                       // 50米容差
                       minDistance = distance;
                       closestLine = taskLine;
@@ -614,37 +775,36 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             children: [
-              //天地图矢量底图 (需把你的tk替换掉末尾的 YOUR_TK)
+              // //天地图矢量底图 (需把你的tk替换掉末尾的 YOUR_TK)
+              // TileLayer(
+              //   urlTemplate:
+              //       'http://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
+              //   userAgentPackageName: 'com.LaputaMao.field_survey',
+              // ),
+              // //天地图矢量注记图层（文字地名，通常盖在底图上面一层）
+              // TileLayer(
+              //   urlTemplate:
+              //       'http://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
+              //   backgroundColor: Colors.transparent, // 背景透明，只盖文字
+              //   userAgentPackageName: 'com.LaputaMao.field_survey',
+              // ),
+
               TileLayer(
+                // 1. 高德卫星纯影像底图图层
                 urlTemplate:
-                    'http://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
-                userAgentPackageName: 'com.LaputaMao.field_survey',
-              ),
-              //天地图矢量注记图层（文字地名，通常盖在底图上面一层）
-              TileLayer(
-                urlTemplate:
-                    'http://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=e48048d5cca7c1445e08536185177ba2',
-                backgroundColor: Colors.transparent, // 背景透明，只盖文字
+                    'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}&key=2f0fcf7450f5ef55cf109244f76c3235',
+                subdomains: const ['1', '2', '3', '4'],
                 userAgentPackageName: 'com.LaputaMao.field_survey',
               ),
 
-              // // todo 切换成高德
-              // TileLayer(
-              //   // 1. 高德卫星纯影像底图图层
-              //   urlTemplate:
-              //       'https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}&key=2f0fcf7450f5ef55cf109244f76c3235',
-              //   subdomains: const ['1', '2', '3', '4'],
-              //   userAgentPackageName: 'com.LaputaMao.field_survey',
-              // ),
-              //
-              // TileLayer(
-              //   // 2. 高德路网及地名标签图层 (透明背景盖在卫星图上)
-              //   urlTemplate:
-              //       'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8&key=2f0fcf7450f5ef55cf109244f76c3235',
-              //   subdomains: const ['1', '2', '3', '4'],
-              //   backgroundColor: Colors.transparent, // 必须透明
-              //   userAgentPackageName: 'com.LaputaMao.field_survey',
-              // ),
+              TileLayer(
+                // 2. 高德路网及地名标签图层 (透明背景盖在卫星图上)
+                urlTemplate:
+                    'https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=8&key=2f0fcf7450f5ef55cf109244f76c3235',
+                subdomains: const ['1', '2', '3', '4'],
+                backgroundColor: Colors.transparent, // 必须透明
+                userAgentPackageName: 'com.LaputaMao.field_survey',
+              ),
 
               // --------------- 渲染 GeoJSON 的多段线 ---------------
               PolylineLayer(
@@ -653,6 +813,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 遍历路线，视图层实时 _wgsToGcj 转换
                   final gcjPoints = taskLine.points
                       .map((p) => _wgsToGcj(p))
+                      // .map((p) => p)
                       .toList();
 
                   return Polyline(
@@ -692,7 +853,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 polylines: [
                   Polyline(
                     // 同样，用户的实际轨迹也是 WGS84，渲染到高德图上时要转 GCJ02
-                    points: _actualRoute.map((p) => _wgsToGcj(p)).toList(),
+                    //todo points: _actualRoute.map((p) => _wgsToGcj(p)).toList(),
+                    points: _actualRoute.map((p) => p).toList(),
                     strokeWidth: 5.0,
                     color: Colors.green,
                   ),
@@ -743,14 +905,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 1. 展现尚未调查的规划打点
                   ..._taskPoints.map(
                     (taskPoint) => Marker(
-                      point: _wgsToGcj(taskPoint.location), // 转 GCJ
+                      point: _wgsToGcj(taskPoint.location), // todo 转 GCJ
                       width: 45,
                       height: 45,
                       child: GestureDetector(
                         onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("请选中关联的路线后开始调查")),
-                          );
+                          _showPropertiesSheet(taskPoint.properties, "规划调查点");
+                          // ScaffoldMessenger.of(context).showSnackBar(
+                          //   SnackBar(content: Text("请选中关联的路线后开始调查")),
+                          // );
                         },
                         child: Icon(
                           Icons.place,
@@ -763,7 +926,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 2. 真实打卡点(你在填表存库时存的是WGS84, _actualPoints 内提取 location 转 GCJ)
                   ..._actualPoints.asMap().entries.map(
                     (entry) => Marker(
-                      point: _wgsToGcj(entry.value['location']), // 转 GCJ
+                      point: entry.value['location'], // todo转 GCJ
                       width: 45,
                       height: 45,
                       child: GestureDetector(
@@ -782,7 +945,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 3. 当前实时 GPS 小蓝点
                   if (_currentLocation != null)
                     Marker(
-                      point: _wgsToGcj(_currentLocation!), // 转 GCJ
+                      point: _currentLocation!, // todo 转 GCJ
                       width: 20,
                       height: 20,
                       child: Container(

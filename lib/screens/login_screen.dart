@@ -91,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Icon(Icons.eco, size: 80, color: Colors.green), // 占位Logo
               SizedBox(height: 20),
               Text(
-                '环探助手',
+                '野外调查APP',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
