@@ -10,12 +10,10 @@ import 'package:dotted_border/dotted_border.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/hold_to_complete_button.dart'; // 引入咱们刚写的长按按钮
 import 'package:coordtransform/coordtransform.dart' as coordtransform;
-
-// import 'package:amap_core/amap_core.dart' as yu hide LatLng, MapOptions;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart'; // 引入你的登录页面
-
 import 'field_survey_form_page.dart';
+import 'package:field_survey/config/api_config.dart';
+import 'package:dio/dio.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -55,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // 新增：记录当前用户选中的线路
   TaskLine? _selectedLine;
 
+
   // 路线与点位存储
   List<LatLng> _actualRoute = []; // 实际走过的绿色轨迹
   List<Map<String, dynamic>> _actualPoints = []; // 实际打的点
@@ -63,6 +62,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isSurveying = false; // 是否在调查中
   LatLng? _currentLocation; // 手机实时GPS位置
   StreamSubscription<Position>? _positionStream; // 轨迹监听流
+  // --- 新增：任务与时间上下文 ---
+  int? _currentTaskId;           // 当前进行中的大任务ID
+  DateTime? _surveyStartTime;    // 任务开始时间
+  final String _baseUrl = ApiConfig.baseUrl; // 换成真实的后端地址
 
   @override
   void initState() {
@@ -203,7 +206,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void _loadTaskToMap(Map<String, dynamic> result) {
     final taskInfo = result['task_info'];
     final detailData = result['detail_data']; // 拿到新的整块 data
-
+    // ⭐ 记录当前的 Task ID 备用
+    _currentTaskId = taskInfo['id'];
     // 准备容器
     List<TaskLine> parsedLines = [];
     List<TaskPoint> parsedPoints = [];
@@ -331,6 +335,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _isSurveying = true;
       _actualRoute.clear();
       _actualPoints.clear();
+      // _surveyStartTime = DateTime.now().toUtc();
+      _surveyStartTime = DateTime.now();
     });
 
     // 2. 开启位置实时监听
@@ -349,246 +355,89 @@ class _HomeScreenState extends State<HomeScreen> {
         });
   }
 
-  void _endSurvey() {
-    // 停止定位监听，打包数据发送后端，清空地图
+  Future<void> _endSurvey() async {
+    // 1. 停止监听 GPS 定位
     _positionStream?.cancel();
 
-    // TODO: 调用后端接口打发数据
-    // api.uploadSurveyResult(route: _actualRoute, points: _actualPoints);
+    // 防止空指针的保险拦截
+    if (_currentTaskId == null || _selectedLine == null || _surveyStartTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("缺少必要任务数据，无法上传")));
+      return;
+    }
 
-    setState(() {
-      _isSurveying = false;
-      _actualRoute.clear();
-      _actualPoints.clear();
-      _currentLocation = null;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('调查已结束，数据已打包上传云端！'),
-        backgroundColor: Colors.green,
-      ),
+    // 弹出加载动画
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Center(child: CircularProgressIndicator(color: Colors.green)),
     );
+
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('jwt_token');
+
+      // 2. 组装符合规范的 GeoJSON LineString
+      // 将 List<LatLng> 转换为后端的 [[lon, lat], [lon, lat]...] 格式
+      List<List<double>> coordinates = _actualRoute.map((point) {
+        return [point.longitude, point.latitude];
+      }).toList();
+
+      // 获取当前线的标识 (适配后端 path_id：假设 properties 存了'线路号')
+      String pathId = _selectedLine!.properties['线路号'] ?? _selectedLine!.properties['Id'] ?? "unknown_path";
+
+      // 3. 构建发送给后端的 payload
+      Map<String, dynamic> payload = {
+        "task_id": _currentTaskId,
+        "path_id": pathId,
+        "actual_line_geom": {
+          "type": "Feature",
+          "geometry": {
+            "type": "LineString",
+            "coordinates": coordinates // 标准的 WGS84 经纬度数组
+          },
+          "properties": {} // 甲方暂时没要求属性可以给空
+        },
+        "start_time": _surveyStartTime!.toIso8601String(), // 例如 "2023-11-01T08:00:00.000Z"
+        // "end_time": DateTime.now().toUtc().toIso8601String(),
+        "end_time": DateTime.now().toIso8601String(),
+      };
+
+      // 4. 发起网络请求
+      var dio = Dio();
+      var response = await dio.post(
+        "$_baseUrl/user/routes/upload",
+        data: payload,
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+
+      Navigator.pop(context); // 关闭加载圈
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // ⭐ 获取后端的 message 并展示
+        String msg = response.data['message'] ?? '轨迹上传成功';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg, style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: Colors.green));
+
+        // 上传完清空视图
+        setState(() {
+          _isSurveying = false;
+          _selectedLine = null; // 释放绑定的路线
+          _actualRoute.clear();
+          _actualPoints.clear();
+          _currentLocation = null;
+          _initCurrentLocation();
+        });
+
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('上传失败：${response.statusCode}')));
+      }
+
+    } catch (e) {
+      Navigator.pop(context); // 关闭加载圈
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('轨迹上传异常：$e')));
+    }
   }
 
-  // ============== 打点填表 (底部弹窗) ==============
-  // void _openSurveyForm({Map<String, dynamic>? existingPoint, int? pointIndex}) {
-  //   if (_currentLocation == null && existingPoint == null) {
-  //     ScaffoldMessenger.of(
-  //       context,
-  //     ).showSnackBar(SnackBar(content: Text("GPS信号弱，请稍后再试")));
-  //     return;
-  //   }
-  //
-  //   // 表单控制器与照片列表
-  //   TextEditingController descController = TextEditingController(
-  //     text: existingPoint?['desc'] ?? '',
-  //   );
-  //   List<String> photos = existingPoint != null
-  //       ? List<String>.from(existingPoint['photos'])
-  //       : [];
-  //
-  //   showModalBottomSheet(
-  //     context: context,
-  //     isScrollControlled: true, // 允许弹窗被键盘顶起
-  //     shape: RoundedRectangleBorder(
-  //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-  //     ),
-  //     builder: (context) {
-  //       // 使用 StatefulBuilder 为了在弹窗内刷新照片列表
-  //       return StatefulBuilder(
-  //         builder: (BuildContext context, StateSetter setModalState) {
-  //           // 拍照方法
-  //           Future<void> _takePhoto() async {
-  //             final ImagePicker _picker = ImagePicker();
-  //             final XFile? image = await _picker.pickImage(
-  //               source: ImageSource.camera,
-  //             );
-  //             if (image != null) {
-  //               setModalState(() {
-  //                 photos.add(image.path); // 将本地图片路径加入列表
-  //               });
-  //             }
-  //           }
-  //
-  //           return Padding(
-  //             padding: EdgeInsets.only(
-  //               bottom: MediaQuery.of(context).viewInsets.bottom, // 防止键盘遮挡
-  //               left: 20,
-  //               right: 20,
-  //               top: 20,
-  //             ),
-  //             child: SingleChildScrollView(
-  //               child: Column(
-  //                 mainAxisSize: MainAxisSize.min,
-  //                 crossAxisAlignment: CrossAxisAlignment.start,
-  //                 children: [
-  //                   Text(
-  //                     existingPoint == null ? "新增调查点" : "查看/编辑调查点",
-  //                     style: TextStyle(
-  //                       fontSize: 20,
-  //                       fontWeight: FontWeight.bold,
-  //                     ),
-  //                   ),
-  //                   SizedBox(height: 10),
-  //                   // 仅显示GPS坐标（防作弊）
-  //                   Text(
-  //                     "打卡坐标：${existingPoint?['location']?.latitude ?? _currentLocation!.latitude}, ${existingPoint?['location']?.longitude ?? _currentLocation!.longitude}",
-  //                     style: TextStyle(color: Colors.grey),
-  //                   ),
-  //                   SizedBox(height: 15),
-  //                   TextField(
-  //                     controller: descController,
-  //                     maxLines: 3,
-  //                     decoration: InputDecoration(
-  //                       labelText: '环境描述与现场情况',
-  //                       border: OutlineInputBorder(),
-  //                     ),
-  //                   ),
-  //                   SizedBox(height: 15),
-  //
-  //                   // 照片区域
-  //                   Text("现场照片", style: TextStyle(fontWeight: FontWeight.bold)),
-  //                   SizedBox(height: 10),
-  //                   Container(
-  //                     height: 80,
-  //                     child: ListView(
-  //                       scrollDirection: Axis.horizontal,
-  //                       children: [
-  //                         // 1. 虚线拍照大按钮
-  //                         GestureDetector(
-  //                           onTap: _takePhoto,
-  //                           child: DottedBorder(
-  //                             color: Colors.grey,
-  //                             strokeWidth: 2,
-  //                             dashPattern: [6, 4], // 虚线长度
-  //                             child: Container(
-  //                               width: 80,
-  //                               height: 80,
-  //                               child: Center(
-  //                                 child: Icon(
-  //                                   Icons.add,
-  //                                   size: 40,
-  //                                   color: Colors.grey,
-  //                                 ),
-  //                               ),
-  //                             ),
-  //                           ),
-  //                         ),
-  //                         SizedBox(width: 10),
-  //
-  //                         // 2. 已拍好的照片快视图列阵
-  //                         ...photos.asMap().entries.map((entry) {
-  //                           int idx = entry.key;
-  //                           String path = entry.value;
-  //                           return Stack(
-  //                             children: [
-  //                               Container(
-  //                                 margin: EdgeInsets.only(right: 10),
-  //                                 width: 80,
-  //                                 height: 80, // 和虚线框等大
-  //                                 decoration: BoxDecoration(
-  //                                   border: Border.all(
-  //                                     color: Colors.grey.shade300,
-  //                                   ),
-  //                                   image: DecorationImage(
-  //                                     image: FileImage(File(path)),
-  //                                     fit: BoxFit.cover,
-  //                                   ),
-  //                                 ),
-  //                               ),
-  //                               // 右上角的删除小红点
-  //                               Positioned(
-  //                                 top: 0,
-  //                                 right: 10,
-  //                                 child: GestureDetector(
-  //                                   onTap: () {
-  //                                     setModalState(() => photos.removeAt(idx));
-  //                                   },
-  //                                   child: Container(
-  //                                     decoration: BoxDecoration(
-  //                                       color: Colors.red,
-  //                                       shape: BoxShape.circle,
-  //                                     ),
-  //                                     child: Icon(
-  //                                       Icons.close,
-  //                                       size: 18,
-  //                                       color: Colors.white,
-  //                                     ),
-  //                                   ),
-  //                                 ),
-  //                               ),
-  //                             ],
-  //                           );
-  //                         }).toList(),
-  //                       ],
-  //                     ),
-  //                   ),
-  //                   SizedBox(height: 20),
-  //
-  //                   // 底部按钮栏
-  //                   Row(
-  //                     children: [
-  //                       if (existingPoint != null) // 如果是查看模式，允许删除整个点位
-  //                         Expanded(
-  //                           child: OutlinedButton(
-  //                             style: OutlinedButton.styleFrom(
-  //                               foregroundColor: Colors.red,
-  //                             ),
-  //                             onPressed: () {
-  //                               setState(
-  //                                 () => _actualPoints.removeAt(pointIndex!),
-  //                               );
-  //                               Navigator.pop(context);
-  //                             },
-  //                             child: Text('删除打卡点'),
-  //                           ),
-  //                         ),
-  //                       if (existingPoint != null) SizedBox(width: 10),
-  //
-  //                       Expanded(
-  //                         flex: 2,
-  //                         child: ElevatedButton(
-  //                           style: ElevatedButton.styleFrom(
-  //                             backgroundColor: Colors.green,
-  //                           ),
-  //                           onPressed: () {
-  //                             // 保存逻辑
-  //                             final newData = {
-  //                               'location':
-  //                                   existingPoint?['location'] ??
-  //                                   _currentLocation,
-  //                               'desc': descController.text,
-  //                               'photos': photos,
-  //                             };
-  //                             setState(() {
-  //                               if (existingPoint == null) {
-  //                                 _actualPoints.add(newData); // 新增
-  //                               } else {
-  //                                 _actualPoints[pointIndex!] = newData; // 修改
-  //                               }
-  //                             });
-  //                             Navigator.pop(context); // 收起弹窗
-  //                           },
-  //                           child: Text(
-  //                             existingPoint == null ? '保存点位' : '更新保存',
-  //                             style: TextStyle(color: Colors.white),
-  //                           ),
-  //                         ),
-  //                       ),
-  //                     ],
-  //                   ),
-  //                   SizedBox(height: 20),
-  //                 ],
-  //               ),
-  //             ),
-  //           );
-  //         },
-  //       );
-  //     },
-  //   );
-  // }
-  // 改写：打点填表逻辑
+
   void _openSurveyForm({
     Map<String, dynamic>? existingPoint,
     int? pointIndex,
@@ -596,7 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_currentLocation == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("GPS信号弱，无法进行打卡")));
+      ).showSnackBar(SnackBar(content: Text("GPS信号弱，无法进行打点")));
       return;
     }
 
@@ -652,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // 如果用户没选（点击空白处取消了），就结束
     if (selectedTemplate == null) return;
     // 假设未选择路线就不能打开，之前已经做了限制。这里提取选择的路线ID传给下个页面做“点号”关联
-    String routeId = _selectedLine?.properties['线路号'] ?? "UNKNOWN";
+    String currentPathId = _selectedLine?.properties['线路号'] ?? "UNKNOWN";
 
     // 使用 Navigator.push 推出全屏表单，并等待表单页点击右上角“完成提交”后返回数据
     final resultData = await Navigator.push(
@@ -661,7 +510,8 @@ class _HomeScreenState extends State<HomeScreen> {
         fullscreenDialog: true, // 加上这个属性，动画会从下往上弹出，像一个系统的全屏工作表
         builder: (context) => FieldSurveyFormPage(
           currentGps: _currentLocation!, // 将真实的GPS（WGS84）发给表单页面自动填进去
-          routeId: routeId,
+          taskId: _currentTaskId!,       // 传真实的TaskId
+          pathId: currentPathId,         // 传路线号
           templateType: selectedTemplate, // 将选中的模板类型传给表单页
         ),
       ),
