@@ -40,16 +40,17 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
 
     // todo 自动填写数据
+    // 1. 三套模板都要用到的【公共基础字段】
     _formData.addAll({
       // 模块0
-      '剖面特征描述': '无', // 自动样例
+      '剖面特征描述': '无',
       // 模块1
       '图幅名': '北京市',
       '图幅号': 'J50E001010',
       '所属三级生态基础分区': '海河北系平原城镇和农田生态区',
       '日期': today,
       '路线号': '${widget.routeId}',
-      '剖面号':'2.2.1-${widget.routeId}-P001',
+      '剖面号': '2.2.1-${widget.routeId}-P001',
       '经度/纬度':
           'E:${widget.currentGps.longitude.toStringAsFixed(4)} / N:${widget.currentGps.latitude.toStringAsFixed(4)}',
       '地面高程': '58 m',
@@ -80,6 +81,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       '照片_空间位置截图': <Map<String, String>>[],
       '照片_样品照片': <Map<String, String>>[],
       '照片_景观描述照片': <Map<String, String>>[],
+      '林草样方照片': <Map<String, String>>[],
       'dynamic_assets_ecoProblem': <Map<String, dynamic>>[],
       'dynamic_assets_sample_0': <Map<String, dynamic>>[], // A.植被的样品
       'dynamic_assets_sample_1': <Map<String, dynamic>>[], // B.土壤的样品
@@ -89,6 +91,18 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       'dynamic_assets_sample_5': <Map<String, dynamic>>[], // F.成土母岩的样品
       'dynamic_assets_sample_6': <Map<String, dynamic>>[], // F.水的样品
     });
+    // 2. 根据不同模板，初始化其【专属独有字段】和【动态表单列表】
+    if (widget.templateType == '1') {
+      // ---- 调查点记录表 专属初始化 ----
+      _formData.addAll({
+        // 初始化调查点独有的照片或组
+      });
+    } else if (widget.templateType == '2') {
+      // ---- 生态地质垂直剖面测量记录表 专属初始化 (保留你原来写好的) ----
+    } else if (widget.templateType == '3') {
+      // ---- 林草调查表 专属初始化 ----
+      _formData.addAll({});
+    }
   }
 
   // ============== 通用 UI 构建器方法 ==============
@@ -194,15 +208,19 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         ),
 
         // ⭐ 修改位置 2：对 DropdownMenuItem 的 child 进行包裹
-        items: items.map((e) => DropdownMenuItem(
-          value: e,
-          child: Text(
-            e,
-            // 作用：防止下拉列表中的长文本再次触发溢出
-            overflow: TextOverflow.ellipsis,
-            softWrap: false,
-          ),
-        )).toList(),
+        items: items
+            .map(
+              (e) => DropdownMenuItem(
+                value: e,
+                child: Text(
+                  e,
+                  // 作用：防止下拉列表中的长文本再次触发溢出
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                ),
+              ),
+            )
+            .toList(),
 
         onChanged: (val) {
           setState(() => map[label] = val);
@@ -609,6 +627,955 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
     );
   }
 
+  // ================= 模板渲染引擎 =================
+
+  // ▶ 模板1：生态地质调查点记录表
+  List<Widget> _buildTemplate1() {
+    return [
+      // ================= 模块 0: 总览图 =================
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('拍照模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          _buildPhotoField('景观描述照片', '照片_景观描述照片'),
+          _buildPhotoField('空间位置截图', '照片_空间位置截图'),
+        ],
+      ),
+
+      // ================= 模块 1: 基础信息 =================
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('基础信息模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          // 空行防止字段被遮挡
+          Row(),
+          _buildInput('工作区'),
+          // _buildAutoBox('图幅名/图幅号'),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('图幅名')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('图幅号')),
+            ],
+          ),
+          _buildAutoBox('所属三级生态基础分区'),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('日期')),
+              SizedBox(width: 8),
+              Expanded(
+                child: _buildDropdown('天气', [
+                  '晴朗',
+                  '多云',
+                  '阴天',
+                  '小雨',
+                  '大雨',
+                  '雪',
+                ]),
+              ),
+            ],
+          ),
+          // _buildAutoBox('路线号/点号/剖面号'),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('路线号')),
+              SizedBox(width: 8),
+              Expanded(flex: 2, child: _buildAutoBox('剖面号')),
+            ],
+          ),
+          _buildAutoBox('经度/纬度'),
+          _buildAutoBox('平面坐标'),
+          Row(
+            children: [
+              Expanded(flex: 2, child: _buildAutoBox('地理位置')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('地面高程')),
+            ],
+          ),
+        ],
+      ),
+
+      // ================= 模块 2: 地貌与生态特征 =================
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('地类信息模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          Row(),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('地貌类型')),
+              SizedBox(width: 8),
+              Expanded(
+                child: _buildDropdown('地貌部位', [
+                  '坡顶(顶部)',
+                  '坡上(上部)',
+                  '坡中(中部)',
+                  '坡下(下部)',
+                  '坡麓(底部)',
+                  '高阶地(洪－冲积平原)',
+                  '低阶地(河流冲积平原)',
+                  '河漫滩',
+                  '底部(排水线)',
+                  '潮上带',
+                  '潮间带',
+                  '其他',
+                ]),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('坡度')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('坡向')),
+            ],
+          ),
+          _buildAutoBox('所属流域'),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('土地利用类型')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('生态系统类型')),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildInput('地表蒸散量')),
+              SizedBox(width: 8),
+              Expanded(child: _buildInput('地下水埋深')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('多年平均降水量')),
+            ],
+          ),
+          // _buildDropdown('生态问题类型/程度等级', [
+          //   '水土流失 - 轻度',
+          //   '水土流失 - 重度',
+          //   '沙化 - 轻度',
+          //   '石漠化',
+          // ]),
+          // _buildDropdown('影响因素', ['气候变化', '人类活动', '地质灾害', '综合因素']),
+          // _buildInput('修复措施'),
+          _buildDynamicCustomGroup_ecoProblem(),
+        ],
+      ),
+
+      // ================= 模块 3: 详细特征观测 =================
+      ExpansionTile(
+        initiallyExpanded: true, // 核心模块默认展开
+        title: Text('特征模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          // 使用横向分段控件选择 A/B/C
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(
+                  value: 0,
+                  label: Text('植被', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 1,
+                  label: Text('土壤', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 2,
+                  label: Text('成土母质', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 3,
+                  label: Text('包气带', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 4,
+                  label: Text('风化壳', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 5,
+                  label: Text('成土母岩', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 6,
+                  label: Text('水', style: TextStyle(fontSize: 15)),
+                ),
+              ],
+              selected: {_module3CurrentTab},
+              onSelectionChanged: (Set<int> newSelection) {
+                setState(() => _module3CurrentTab = newSelection.first);
+              },
+            ),
+          ),
+          SizedBox(height: 10),
+
+          // 标签面板 A: 植被特征
+          if (_module3CurrentTab == 0) ...[
+            Row(
+              children: [
+                Expanded(flex: 3, child: _buildAutoBox('植被类型')),
+                SizedBox(width: 8),
+                Expanded(flex: 3, child: _buildInput('植被覆盖度(%)')),
+                SizedBox(width: 8),
+                Expanded(flex: 2, child: _buildInput('高度(m)')),
+              ],
+            ),
+            _buildDropdown('起源', ['自然植被', '人工植被']),
+            Row(
+              children: [
+                Expanded(child: _buildInput('植被优势种')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('乡土适生种')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('引进适生种')),
+              ],
+            ),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_0"),
+          ],
+
+          // 标签面板 B: 土壤特征
+          if (_module3CurrentTab == 1) ...[
+            // _buildAutoBox('土壤类型/侵蚀/强度'),
+            Row(
+              children: [
+                Expanded(child: _buildAutoBox('土壤类型')),
+                SizedBox(width: 8),
+                Expanded(child: _buildAutoBox('侵蚀类型')),
+                SizedBox(width: 8),
+                Expanded(child: _buildAutoBox('侵蚀强度')),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildInput('土壤颜色')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('厚度(cm)')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('土被覆盖率')),
+              ],
+            ),
+            _buildInput('分层结构'),
+            _buildInput('土壤质地'),
+            // Row(
+            //   children: [
+            //     Expanded(child: _buildInput('紧实度')),
+            //     SizedBox(width: 8),
+            //     Expanded(child: _buildInput('结持性')),
+            //     SizedBox(width: 8),
+            //     Expanded(child: _buildInput('砾石含量(%)')),
+            //   ],
+            // ),
+            // Row(
+            //   children: [
+            //     Expanded(child: _buildInput('pH值')),
+            //     SizedBox(width: 8),
+            //     Expanded(child: _buildInput('温度(℃)')),
+            //     SizedBox(width: 8),
+            //     Expanded(child: _buildInput('含水量')),
+            //   ],
+            // ),
+            // Row(
+            //   children: [
+            //     Expanded(child: _buildInput('电导率')),
+            //     SizedBox(width: 8),
+            //     Expanded(child: _buildInput('含盐量')),
+            //   ],
+            // ),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_1"),
+          ],
+
+          // 标签面板 C: 母质特征
+          if (_module3CurrentTab == 2) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDropdown('母质类型', [
+                    '风积沙',
+                    '原生黄土',
+                    '黄土状物质 (次生黄土)',
+                    '残积物',
+                    '坡积物',
+                    '冲积物',
+                    '海岸沉积物',
+                    '湖泊沉积物',
+                    '河流沉积物',
+                    '火成碎屑沉积物',
+                    '冰川沉积物 (冰碛物)',
+                    '冰水沉积物',
+                    '有机沉积物',
+                    '崩积物',
+                    '(古) 红黏土',
+                    '其他',
+                  ]),
+                ),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('颜色')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('厚度(m)')),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildInput('成土母质层结构')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('成土母质松散度')),
+              ],
+            ),
+            _buildInput('成土母质成分及比例'),
+            Divider(),
+            // Text('包气带与风化壳', style: TextStyle(color: Colors.grey)),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_2"),
+          ],
+
+          if (_module3CurrentTab == 3) ...[
+            Row(
+              children: [
+                Expanded(child: _buildInput('包气带厚度(m)')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('包气带渗透系数')),
+              ],
+            ),
+            _buildInput('包气带垂直结构'),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_3"),
+          ],
+
+          if (_module3CurrentTab == 4) ...[
+            Row(
+              children: [
+                Expanded(child: _buildInput('风化壳类型')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('风化壳厚度')),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildInput('风化壳风化程度')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('风化壳垂直结构')),
+              ],
+            ),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_4"),
+          ],
+
+          if (_module3CurrentTab == 5) ...[
+            Row(
+              children: [
+                Expanded(child: _buildInput('成土母岩岩性')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('成土母岩颜色')),
+              ],
+            ),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_5"),
+          ],
+
+          if (_module3CurrentTab == 6) ...[
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_6"),
+          ],
+
+          // Text('水', style: TextStyle(
+          //   fontSize: 20,
+          //   color: Colors.green[800],
+          //   fontWeight: FontWeight.bold,
+          // )),
+          // Text('', style: TextStyle()),
+        ],
+      ),
+
+      // ================= 模块 4: 采样与影像资料 =================
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('概述模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          Text('', style: TextStyle()),
+          _buildAutoBox('柱状剖面描述'),
+          _buildAutoBox('景观描述内容'),
+        ],
+      ),
+
+      // ================= 模块 5: 责任声明 =================
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('填表人员记录', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          Text('', style: TextStyle(color: Colors.grey)),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('调查人')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('记录人')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('审核人')),
+            ],
+          ),
+        ],
+      ),
+      SizedBox(height: 50), // 底部留白
+    ];
+  }
+
+  // ▶ 模板2：生态地质垂直剖面测量记录表 (把你写好的代码平移过来)
+  List<Widget> _buildTemplate2() {
+    return [
+      // ================= 模块 0: 总览图 =================
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('拍照模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          _buildPhotoField('柱状剖面图', '照片_柱状剖面图'),
+          // _buildAutoBox('剖面特征描述'),
+          _buildPhotoField('景观描述照片', '照片_景观描述照片'),
+          // _buildPhotoField('空间位置截图', '照片_空间位置截图'),
+        ],
+      ),
+
+      // ================= 模块 1: 基础信息 =================
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('基础信息模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          // 空行防止字段被遮挡
+          Row(),
+          _buildInput('工作区'),
+          // _buildAutoBox('图幅名/图幅号'),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('图幅名')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('图幅号')),
+            ],
+          ),
+          _buildAutoBox('所属三级生态基础分区'),
+          // _buildDropdown('剖面类型', ['自然剖面', '人工剖面', '浅钻']),
+          // _buildDropdown('天气', ['晴朗', '多云', '阴天', '小雨', '大雨', '雪']),
+          Row(
+            children: [
+              Expanded(child: _buildDropdown('剖面类型', ['自然剖面', '人工剖面', '浅钻'])),
+              SizedBox(width: 8),
+              Expanded(
+                child: _buildDropdown('天气', [
+                  '晴朗',
+                  '多云',
+                  '阴天',
+                  '小雨',
+                  '大雨',
+                  '雪',
+                ]),
+              ),
+            ],
+          ),
+          _buildAutoBox('日期'),
+          // _buildAutoBox('路线号/点号/剖面号'),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('路线号')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('剖面号')),
+            ],
+          ),
+          _buildAutoBox('经度/纬度'),
+          _buildAutoBox('平面坐标'),
+          Row(
+            children: [
+              Expanded(flex: 2, child: _buildAutoBox('地理位置')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('地面高程')),
+            ],
+          ),
+        ],
+      ),
+
+      // ================= 模块 2: 地貌与生态特征 =================
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('地类信息模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          Row(),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('地貌类型')),
+              SizedBox(width: 8),
+              Expanded(
+                child: _buildDropdown('地貌部位', [
+                  '坡顶(顶部)',
+                  '坡上(上部)',
+                  '坡中(中部)',
+                  '坡下(下部)',
+                  '坡麓(底部)',
+                  '高阶地(洪－冲积平原)',
+                  '低阶地(河流冲积平原)',
+                  '河漫滩',
+                  '底部(排水线)',
+                  '潮上带',
+                  '潮间带',
+                  '其他',
+                ]),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('坡度')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('所属流域')),
+            ],
+          ),
+          // _buildAutoBox('土地利用/生态系统类型'),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('土地利用类型')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('生态系统类型')),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildInput('地表蒸散量')),
+              SizedBox(width: 8),
+              Expanded(child: _buildInput('地下水埋深')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('多年平均降水量')),
+            ],
+          ),
+          // _buildDropdown('生态问题类型/程度等级', [
+          //   '水土流失 - 轻度',
+          //   '水土流失 - 重度',
+          //   '沙化 - 轻度',
+          //   '石漠化',
+          // ]),
+          // _buildDropdown('影响因素', ['气候变化', '人类活动', '地质灾害', '综合因素']),
+          // _buildInput('修复措施'),
+          _buildDynamicCustomGroup_ecoProblem(),
+        ],
+      ),
+
+      // ================= 模块 3: 详细特征观测 =================
+      ExpansionTile(
+        initiallyExpanded: true, // 核心模块默认展开
+        title: Text('特征模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          // 使用横向分段控件选择 A/B/C
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(
+                  value: 0,
+                  label: Text('植被', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 1,
+                  label: Text('土壤', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 2,
+                  label: Text('成土母质', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 3,
+                  label: Text('包气带', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 4,
+                  label: Text('风化壳', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 5,
+                  label: Text('成土母岩', style: TextStyle(fontSize: 15)),
+                ),
+                ButtonSegment(
+                  value: 6,
+                  label: Text('水', style: TextStyle(fontSize: 15)),
+                ),
+              ],
+              selected: {_module3CurrentTab},
+              onSelectionChanged: (Set<int> newSelection) {
+                setState(() => _module3CurrentTab = newSelection.first);
+              },
+            ),
+          ),
+          SizedBox(height: 10),
+
+          // 标签面板 A: 植被特征
+          if (_module3CurrentTab == 0) ...[
+            Row(
+              children: [
+                Expanded(flex: 3, child: _buildAutoBox('植被类型')),
+                SizedBox(width: 8),
+                Expanded(flex: 3, child: _buildInput('植被覆盖度(%)')),
+                SizedBox(width: 8),
+                Expanded(flex: 2, child: _buildInput('高度(m)')),
+              ],
+            ),
+            _buildDropdown('起源', ['自然植被', '人工植被']),
+            Row(
+              children: [
+                Expanded(child: _buildInput('植被优势种')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('乡土适生种')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('引进适生种')),
+              ],
+            ),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_0"),
+          ],
+
+          // 标签面板 B: 土壤特征
+          if (_module3CurrentTab == 1) ...[
+            // _buildAutoBox('土壤类型/侵蚀/强度'),
+            Row(
+              children: [
+                Expanded(child: _buildAutoBox('土壤类型')),
+                SizedBox(width: 8),
+                Expanded(child: _buildAutoBox('侵蚀类型')),
+                SizedBox(width: 8),
+                Expanded(child: _buildAutoBox('侵蚀强度')),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildInput('土壤颜色')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('厚度(cm)')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('土被覆盖率')),
+              ],
+            ),
+            _buildInput('分层结构'),
+            _buildInput('土壤质地'),
+            Row(
+              children: [
+                Expanded(child: _buildInput('紧实度')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('结持性')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('砾石含量(%)')),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildInput('pH值')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('温度(℃)')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('含水量')),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildInput('电导率')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('含盐量')),
+              ],
+            ),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_1"),
+          ],
+
+          // 标签面板 C: 母质特征
+          if (_module3CurrentTab == 2) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDropdown('母质类型', [
+                    '风积沙',
+                    '原生黄土',
+                    '黄土状物质 (次生黄土)',
+                    '残积物',
+                    '坡积物',
+                    '冲积物',
+                    '海岸沉积物',
+                    '湖泊沉积物',
+                    '河流沉积物',
+                    '火成碎屑沉积物',
+                    '冰川沉积物 (冰碛物)',
+                    '冰水沉积物',
+                    '有机沉积物',
+                    '崩积物',
+                    '(古) 红黏土',
+                    '其他',
+                  ]),
+                ),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('颜色')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('厚度(m)')),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildInput('成土母质层结构')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('成土母质松散度')),
+              ],
+            ),
+            _buildInput('成土母质成分及比例'),
+            Divider(),
+            // Text('包气带与风化壳', style: TextStyle(color: Colors.grey)),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_2"),
+          ],
+
+          if (_module3CurrentTab == 3) ...[
+            Row(
+              children: [
+                Expanded(child: _buildInput('包气带厚度(m)')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('包气带渗透系数')),
+              ],
+            ),
+            _buildInput('包气带垂直结构'),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_3"),
+          ],
+
+          if (_module3CurrentTab == 4) ...[
+            Row(
+              children: [
+                Expanded(child: _buildInput('风化壳类型')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('风化壳厚度')),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildInput('风化壳风化程度')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('风化壳垂直结构')),
+              ],
+            ),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_4"),
+          ],
+
+          if (_module3CurrentTab == 5) ...[
+            Row(
+              children: [
+                Expanded(child: _buildInput('成土母岩岩性')),
+                SizedBox(width: 8),
+                Expanded(child: _buildInput('成土母岩颜色')),
+              ],
+            ),
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_5"),
+          ],
+
+          if (_module3CurrentTab == 6) ...[
+            _buildDynamicCustomGroup_sample("dynamic_assets_sample_6"),
+          ],
+
+          // Text('水', style: TextStyle(
+          //   fontSize: 20,
+          //   color: Colors.green[800],
+          //   fontWeight: FontWeight.bold,
+          // )),
+          // Text('', style: TextStyle()),
+        ],
+      ),
+
+      // ================= 模块 4: 采样与影像资料 =================
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('概述模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          Text('', style: TextStyle()),
+          _buildAutoBox('柱状剖面描述'),
+          _buildAutoBox('景观描述内容'),
+        ],
+      ),
+
+      // ================= 模块 5: 责任声明 =================
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('填表人员记录', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          Text('', style: TextStyle(color: Colors.grey)),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('调查人')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('记录人')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('审核人')),
+            ],
+          ),
+        ],
+      ),
+      SizedBox(height: 50), // 底部留白
+    ];
+  }
+
+  // ▶ 模板3：林草调查表_乔木
+  List<Widget> _buildTemplate3() {
+    return [
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('样方取样模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [_buildPhotoField('林草样方照片', '林草样方照片')],
+      ),
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('样方记录模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          Text(''),
+          Row(
+            children: [
+              Expanded(flex: 2, child: _buildAutoBox('样地号')),
+              SizedBox(width: 8),
+              Expanded(child: _buildDropdown('样地面积', ['20*20(m)', '30*30(m)'])),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildDropdown('森林起源', ['天然林', '人工林', '次生林'])),
+              SizedBox(width: 8),
+              Expanded(
+                child: _buildDropdown('植被类型', [
+                  '栽培植被',
+                  '针叶林',
+                  '阔叶林',
+                  '草甸',
+                  '沼泽',
+                  '灌丛',
+                  '针阔叶混交林',
+                  '草原',
+                  '高山植被',
+                  '无植被地段',
+                  '荒漠',
+                  '草丛',
+                ]),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildInput('植被总盖度%')),
+              SizedBox(width: 8),
+              Expanded(child: _buildInput('林分郁闭度%')),
+            ],
+          ),
+          _buildInput('优势树种'),
+          Row(
+            children: [
+              Expanded(child: _buildInput('平均年龄')),
+              SizedBox(width: 8),
+              Expanded(child: _buildInput('平均树高(m)')),
+              SizedBox(width: 8),
+              Expanded(child: _buildInput('平均胸径(cm)')),
+            ],
+          ),
+          _buildInput('根系发育深度'),
+          _buildInput('林草样方总体描述'),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('调查人')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('记录人')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('审核人')),
+            ],
+          ),
+        ],
+      ),
+      SizedBox(height: 50),
+    ];
+  }
+
+  // ▶ 模板4：林草调查表_灌木
+  List<Widget> _buildTemplate4() {
+    return [
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('样方登记模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          ExpansionTile(
+            initiallyExpanded: true,
+            title: Text('样方取样模块', style: TextStyle(fontWeight: FontWeight.bold)),
+            children: [_buildPhotoField('林草样方照片', '林草样方照片')],
+          ),
+          ExpansionTile(
+            initiallyExpanded: true,
+            title: Text('样方记录模块', style: TextStyle(fontWeight: FontWeight.bold)),
+            children: [
+              Text(''),
+              Row(
+                children: [
+                  Expanded(flex: 2, child: _buildAutoBox('样方号')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildAutoBox('灌木样方面积')),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(child: _buildInput('优势种')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildInput('覆盖度%')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildInput('平均高(m)')),
+                ],
+              ),
+              _buildInput('根系发育深度'),
+              _buildInput('林草样方总体描述'),
+              Row(
+                children: [
+                  Expanded(child: _buildAutoBox('调查人')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildAutoBox('记录人')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildAutoBox('审核人')),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+      SizedBox(height: 50),
+    ];
+  }
+
+  // ▶ 模板5：林草调查表_草木
+  List<Widget> _buildTemplate5() {
+    return [
+      ExpansionTile(
+        initiallyExpanded: true,
+        title: Text('样方登记模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [
+          ExpansionTile(
+            initiallyExpanded: true,
+            title: Text('样方取样模块', style: TextStyle(fontWeight: FontWeight.bold)),
+            children: [_buildPhotoField('林草样方照片', '林草样方照片')],
+          ),
+          ExpansionTile(
+            initiallyExpanded: true,
+            title: Text('样方记录模块', style: TextStyle(fontWeight: FontWeight.bold)),
+            children: [
+              Text(''),
+              Row(
+                children: [
+                  Expanded(flex: 2, child: _buildAutoBox('样方号')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildAutoBox('草木样方面积')),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(child: _buildInput('优势种')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildInput('覆盖度%')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildInput('平均高(m)')),
+                ],
+              ),
+              _buildInput('根系发育深度'),
+              _buildInput('林草样方总体描述'),
+              Row(
+                children: [
+                  Expanded(child: _buildAutoBox('调查人')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildAutoBox('记录人')),
+                  SizedBox(width: 8),
+                  Expanded(child: _buildAutoBox('审核人')),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+      SizedBox(height: 50),
+    ];
+  }
+
   // ============== 页面构建 ==============
   @override
   Widget build(BuildContext context) {
@@ -616,10 +1583,27 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
     String title = "测量记录表";
     if (widget.templateType == '1') title = "生态地质调查点记录表";
     if (widget.templateType == '2') title = "生态地质垂直剖面测量记录表";
-    if (widget.templateType == '3') title = "生态地质垂直剖面测量点林草调查表";
+    if (widget.templateType == '3') title = "乔木_生态地质垂直剖面测量点林草调查表";
+    if (widget.templateType == '4') title = "灌木_生态地质垂直剖面测量点林草调查表";
+    if (widget.templateType == '5') title = "草木_生态地质垂直剖面测量点林草调查表";
+
+    // 动态分发 Body 块
+    List<Widget> formChildren;
+    if (widget.templateType == '1') {
+      formChildren = _buildTemplate1();
+    } else if (widget.templateType == '2') {
+      formChildren = _buildTemplate2();
+    } else if (widget.templateType == '3') {
+      formChildren = _buildTemplate3();
+    } else if (widget.templateType == '4') {
+      formChildren = _buildTemplate4();
+    } else {
+      formChildren = _buildTemplate5();
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('生态地质垂直剖面测量记录表'),
+        title: Text(title),
         titleTextStyle: TextStyle(color: Colors.black, fontSize: 18),
         backgroundColor: Colors.green,
         actions: [
@@ -636,405 +1620,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         ],
       ),
       // 外层使用 ListView 避免键盘遮挡报错
-      body: ListView(
-        padding: EdgeInsets.all(12),
-        children: [
-          // ================= 模块 0: 总览图 =================
-          ExpansionTile(
-            initiallyExpanded: true,
-            title: Text('拍照模块', style: TextStyle(fontWeight: FontWeight.bold)),
-            children: [
-              _buildPhotoField('柱状剖面图', '照片_柱状剖面图'),
-              // _buildAutoBox('剖面特征描述'),
-              _buildPhotoField('景观描述照片', '照片_景观描述照片'),
-              // _buildPhotoField('空间位置截图', '照片_空间位置截图'),
-            ],
-          ),
-
-          // ================= 模块 1: 基础信息 =================
-          ExpansionTile(
-            initiallyExpanded: true,
-            title: Text(
-              '基础信息模块',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            children: [
-              // 空行防止字段被遮挡
-              Row(),
-              _buildInput('工作区'),
-              // _buildAutoBox('图幅名/图幅号'),
-              Row(
-                children: [
-                  Expanded(child: _buildAutoBox('图幅名')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('图幅号')),
-                ],
-              ),
-              _buildAutoBox('所属三级生态基础分区'),
-              // _buildDropdown('剖面类型', ['自然剖面', '人工剖面', '浅钻']),
-              // _buildDropdown('天气', ['晴朗', '多云', '阴天', '小雨', '大雨', '雪']),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildDropdown('剖面类型', ['自然剖面', '人工剖面', '浅钻']),
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: _buildDropdown('天气', [
-                      '晴朗',
-                      '多云',
-                      '阴天',
-                      '小雨',
-                      '大雨',
-                      '雪',
-                    ]),
-                  ),
-                ],
-              ),
-              _buildAutoBox('日期'),
-              // _buildAutoBox('路线号/点号/剖面号'),
-              Row(
-                children: [
-                  Expanded(child: _buildAutoBox('路线号')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('剖面号')),
-                ],
-              ),
-              _buildAutoBox('经度/纬度'),
-              _buildAutoBox('平面坐标'),
-              Row(
-                children: [
-                  Expanded(flex: 2, child: _buildAutoBox('地理位置')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('地面高程')),
-                ],
-              ),
-            ],
-          ),
-
-          // ================= 模块 2: 地貌与生态特征 =================
-          ExpansionTile(
-            initiallyExpanded: true,
-            title: Text(
-              '地类信息模块',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            children: [
-              Row(),
-              Row(
-                children: [
-                  Expanded(child: _buildAutoBox('地貌类型')),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: _buildDropdown('地貌部位', [
-                      '坡顶(顶部)',
-                      '坡上(上部)',
-                      '坡中(中部)',
-                      '坡下(下部)',
-                      '坡麓(底部)',
-                      '高阶地(洪－冲积平原)',
-                      '低阶地(河流冲积平原)',
-                      '河漫滩',
-                      '底部(排水线)',
-                      '潮上带',
-                      '潮间带',
-                      '其他',
-                    ]),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(child: _buildAutoBox('坡度')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('所属流域')),
-                ],
-              ),
-              // _buildAutoBox('土地利用/生态系统类型'),
-              Row(
-                children: [
-                  Expanded(child: _buildAutoBox('土地利用类型')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('生态系统类型')),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(child: _buildInput('地表蒸散量')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildInput('地下水埋深')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('多年平均降水量')),
-                ],
-              ),
-              // _buildDropdown('生态问题类型/程度等级', [
-              //   '水土流失 - 轻度',
-              //   '水土流失 - 重度',
-              //   '沙化 - 轻度',
-              //   '石漠化',
-              // ]),
-              // _buildDropdown('影响因素', ['气候变化', '人类活动', '地质灾害', '综合因素']),
-              // _buildInput('修复措施'),
-              _buildDynamicCustomGroup_ecoProblem(),
-            ],
-          ),
-
-          // ================= 模块 3: 详细特征观测 =================
-          ExpansionTile(
-            initiallyExpanded: true, // 核心模块默认展开
-            title: Text(
-              '特征模块',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            children: [
-              // 使用横向分段控件选择 A/B/C
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<int>(
-                  segments: const [
-                    ButtonSegment(
-                      value: 0,
-                      label: Text('植被', style: TextStyle(fontSize: 15)),
-                    ),
-                    ButtonSegment(
-                      value: 1,
-                      label: Text('土壤', style: TextStyle(fontSize: 15)),
-                    ),
-                    ButtonSegment(
-                      value: 2,
-                      label: Text('成土母质', style: TextStyle(fontSize: 15)),
-                    ),
-                    ButtonSegment(
-                      value: 3,
-                      label: Text('包气带', style: TextStyle(fontSize: 15)),
-                    ),
-                    ButtonSegment(
-                      value: 4,
-                      label: Text('风化壳', style: TextStyle(fontSize: 15)),
-                    ),
-                    ButtonSegment(
-                      value: 5,
-                      label: Text('成土母岩', style: TextStyle(fontSize: 15)),
-                    ),
-                    ButtonSegment(
-                      value: 6,
-                      label: Text('水', style: TextStyle(fontSize: 15)),
-                    ),
-                  ],
-                  selected: {_module3CurrentTab},
-                  onSelectionChanged: (Set<int> newSelection) {
-                    setState(() => _module3CurrentTab = newSelection.first);
-                  },
-                ),
-              ),
-              SizedBox(height: 10),
-
-              // 标签面板 A: 植被特征
-              if (_module3CurrentTab == 0) ...[
-                Row(
-                  children: [
-                    Expanded(flex: 3, child: _buildAutoBox('植被类型')),
-                    SizedBox(width: 8),
-                    Expanded(flex: 3, child: _buildInput('植被覆盖度(%)')),
-                    SizedBox(width: 8),
-                    Expanded(flex: 2, child: _buildInput('高度(m)')),
-                  ],
-                ),
-                _buildDropdown('起源', ['自然植被', '人工植被']),
-                Row(
-                  children: [
-                    Expanded(child: _buildInput('植被优势种')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('乡土适生种')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('引进适生种')),
-                  ],
-                ),
-                _buildDynamicCustomGroup_sample("dynamic_assets_sample_0"),
-              ],
-
-              // 标签面板 B: 土壤特征
-              if (_module3CurrentTab == 1) ...[
-                // _buildAutoBox('土壤类型/侵蚀/强度'),
-                Row(
-                  children: [
-                    Expanded(child: _buildAutoBox('土壤类型')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildAutoBox('侵蚀类型')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildAutoBox('侵蚀强度')),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Expanded(child: _buildInput('土壤颜色')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('厚度(cm)')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('土被覆盖率')),
-                  ],
-                ),
-                _buildInput('分层结构'),
-                _buildInput('土壤质地'),
-                Row(
-                  children: [
-                    Expanded(child: _buildInput('紧实度')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('结持性')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('砾石含量(%)')),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Expanded(child: _buildInput('pH值')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('温度(℃)')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('含水量')),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Expanded(child: _buildInput('电导率')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('含盐量')),
-                  ],
-                ),
-                _buildDynamicCustomGroup_sample("dynamic_assets_sample_1"),
-              ],
-
-              // 标签面板 C: 母质特征
-              if (_module3CurrentTab == 2) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildDropdown('母质类型', [
-                        '风积沙',
-                        '原生黄土',
-                        '黄土状物质 (次生黄土)',
-                        '残积物',
-                        '坡积物',
-                        '冲积物',
-                        '海岸沉积物',
-                        '湖泊沉积物',
-                        '河流沉积物',
-                        '火成碎屑沉积物',
-                        '冰川沉积物 (冰碛物)',
-                        '冰水沉积物',
-                        '有机沉积物',
-                        '崩积物',
-                        '(古) 红黏土',
-                        '其他',
-                      ]),
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('颜色')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('厚度(m)')),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Expanded(child: _buildInput('成土母质层结构')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('成土母质松散度')),
-                  ],
-                ),
-                _buildInput('成土母质成分及比例'),
-                Divider(),
-                // Text('包气带与风化壳', style: TextStyle(color: Colors.grey)),
-                _buildDynamicCustomGroup_sample("dynamic_assets_sample_2"),
-              ],
-
-              if (_module3CurrentTab == 3) ...[
-                Row(
-                  children: [
-                    Expanded(child: _buildInput('包气带厚度(m)')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('包气带渗透系数')),
-                  ],
-                ),
-                _buildInput('包气带垂直结构'),
-                _buildDynamicCustomGroup_sample("dynamic_assets_sample_3"),
-              ],
-
-              if (_module3CurrentTab == 4) ...[
-                Row(
-                  children: [
-                    Expanded(child: _buildInput('风化壳类型')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('风化壳厚度')),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Expanded(child: _buildInput('风化壳风化程度')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('风化壳垂直结构')),
-                  ],
-                ),
-                _buildDynamicCustomGroup_sample("dynamic_assets_sample_4"),
-              ],
-
-              if (_module3CurrentTab == 5) ...[
-                Row(
-                  children: [
-                    Expanded(child: _buildInput('成土母岩岩性')),
-                    SizedBox(width: 8),
-                    Expanded(child: _buildInput('成土母岩颜色')),
-                  ],
-                ),
-                _buildDynamicCustomGroup_sample("dynamic_assets_sample_5"),
-              ],
-
-              if (_module3CurrentTab == 6) ...[
-                _buildDynamicCustomGroup_sample("dynamic_assets_sample_6"),
-              ],
-
-              // Text('水', style: TextStyle(
-              //   fontSize: 20,
-              //   color: Colors.green[800],
-              //   fontWeight: FontWeight.bold,
-              // )),
-              // Text('', style: TextStyle()),
-            ],
-          ),
-
-          // ================= 模块 4: 采样与影像资料 =================
-          ExpansionTile(
-            initiallyExpanded: true,
-            title: Text('概述模块', style: TextStyle(fontWeight: FontWeight.bold)),
-            children: [
-              Text('', style: TextStyle()),
-              _buildAutoBox('柱状剖面描述'),
-              _buildAutoBox('景观描述内容'),
-            ],
-          ),
-
-          // ================= 模块 5: 责任声明 =================
-          ExpansionTile(
-            initiallyExpanded: true,
-            title: Text(
-              '填表人员记录',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            children: [
-              Text('', style: TextStyle(color: Colors.grey)),
-              Row(
-                children: [
-                  Expanded(child: _buildAutoBox('调查人')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('记录人')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('审核人')),
-                ],
-              ),
-            ],
-          ),
-          SizedBox(height: 50), // 底部留白
-        ],
-      ),
+      body: ListView(padding: EdgeInsets.all(12), children: formChildren),
     );
   }
 }

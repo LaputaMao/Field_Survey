@@ -44,6 +44,8 @@ dependencies:
   permission_handler: ^11.0.1 # 处理权限请求
   coordtransform: ^1.0.2  # WGS-84 与 GCJ-02、BD-09 互转库
   amap_core: ^1.0.4
+  dio: ^5.4.0
+
 
 
 dev_dependencies:

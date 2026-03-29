@@ -49,6 +49,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<TaskLine> _taskLines = [];
   List<TaskPoint> _taskPoints = [];
 
+  // 新增：存放从后端拉下来的该任务曾经走过的真实轨迹（历史轨）
+  List<List<LatLng>> _historyActualRoutes = [];
+
   // 新增：记录当前用户选中的线路
   TaskLine? _selectedLine;
 
@@ -199,22 +202,27 @@ class _HomeScreenState extends State<HomeScreen> {
   // 3. 重写 _loadTaskToMap 方法处理 GeoJSON
   void _loadTaskToMap(Map<String, dynamic> result) {
     final taskInfo = result['task_info'];
-    final geojson = result['geojson'];
+    final detailData = result['detail_data']; // 拿到新的整块 data
 
+    // 准备容器
     List<TaskLine> parsedLines = [];
     List<TaskPoint> parsedPoints = [];
-    List<LatLng> allCoordinatesForBounding = []; // 用于计算地图缩放视野
+    List<List<LatLng>> parsedHistoryRoutes = [];
+    List<LatLng> allCoordinatesForBounding = []; // 用于视角缩放(包含WGS84)
 
-    if (geojson['type'] == 'FeatureCollection' && geojson['features'] != null) {
-      for (var feature in geojson['features']) {
+    // 1. 解析规划图层 planned_geojson
+    final plannedGeojson = detailData['planned_geojson'];
+    if (plannedGeojson != null &&
+        plannedGeojson['type'] == 'FeatureCollection' &&
+        plannedGeojson['features'] != null) {
+      for (var feature in plannedGeojson['features']) {
         final geometry = feature['geometry'];
         final properties = feature['properties'] ?? {};
 
         if (geometry['type'] == 'LineString') {
           List<LatLng> lineCoords = [];
           for (var coord in geometry['coordinates']) {
-            // GeoJSON 格式是 [Lon, Lat]，所以 coord[1] 是纬度，coord[0] 是经度
-            LatLng ll = LatLng(coord[1], coord[0]);
+            LatLng ll = LatLng(coord[1], coord[0]); // [lon, lat] 转 LatLng
             lineCoords.add(ll);
             allCoordinatesForBounding.add(ll);
           }
@@ -228,26 +236,42 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
+    // 2. 解析实际轨迹图层 actual_line_geoms (新增)
+    final actualGeoms = detailData['actual_line_geoms'];
+    if (actualGeoms != null && actualGeoms is List) {
+      for (var feature in actualGeoms) {
+        if (feature['type'] == 'Feature' &&
+            feature['geometry']['type'] == 'LineString') {
+          List<LatLng> actCoords = [];
+          for (var coord in feature['geometry']['coordinates']) {
+            LatLng ll = LatLng(coord[1], coord[0]);
+            actCoords.add(ll);
+            allCoordinatesForBounding.add(ll); // 缩放视野时也要把人走过的地方包进去
+          }
+          parsedHistoryRoutes.add(actCoords);
+        }
+      }
+    }
+
     setState(() {
       _taskLines = parsedLines;
       _taskPoints = parsedPoints;
-      _currentTaskTitle = "执行任务: #${taskInfo['id']} (${taskInfo['status']})";
+      _historyActualRoutes = parsedHistoryRoutes; // 保存历史轨迹
+      _currentTaskTitle =
+          "任务: #${taskInfo['id']} (${detailData['task_status']})";
+      _selectedLine = null; // 重置选中状态
     });
 
-    // 修改：为了在加载任务时精确将画面缩放到包含所有要素，边界计算也应使用 GCJ02
+    // ========== 视角自动缩放 (需使用 WGS转GCJ) ==========
     if (allCoordinatesForBounding.isNotEmpty) {
-      // 把所有的 WGS84 临时转成 GCJ 算边界123123
       final gcjBoundsCoordinates = allCoordinatesForBounding
-           .map((p) => _wgsToGcj(p))
+          .map((p) => _wgsToGcj(p))
           // .map((p) => p)
           .toList();
       final bounds = LatLngBounds.fromPoints(gcjBoundsCoordinates);
-      // flutter_map 6.x 控制视角缩放的方法 (增加了一些 Padding 防止点贴在屏幕边缘)
+
       _mapController.fitCamera(
-        CameraFit.bounds(
-          bounds: bounds,
-          padding: EdgeInsets.all(50.0), // 四周留出 50 像素空隙
-        ),
+        CameraFit.bounds(bounds: bounds, padding: EdgeInsets.all(50.0)),
       );
     }
   }
@@ -320,7 +344,7 @@ class _HomeScreenState extends State<HomeScreen> {
           setState(() {
             _currentLocation = LatLng(position.latitude, position.longitude);
             _actualRoute.add(_currentLocation!); // 压入绿色轨迹点
-            _mapController.move(_currentLocation!, 16.0); // 视角跟随移动
+            _mapController.move(_wgsToGcj(_currentLocation!), 16.0); // 视角跟随移动
           });
         });
   }
@@ -601,14 +625,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () => Navigator.pop(context, '1'), // 传回代号1
               ),
               ListTile(
-                leading: Icon(Icons.route, color: Colors.blue),
+                leading: Icon(Icons.assignment, color: Colors.blue),
                 title: Text('生态地质垂直剖面测量记录表'),
                 onTap: () => Navigator.pop(context, '2'),
               ),
               ListTile(
-                leading: Icon(Icons.place, color: Colors.orange),
-                title: Text('生态地质垂直剖面测量点林草调查表'),
+                leading: Icon(Icons.assignment, color: Colors.orange[200]),
+                title: Text('生态地质垂直剖面测量点林草调查表(乔木)'),
                 onTap: () => Navigator.pop(context, '3'),
+              ),
+              ListTile(
+                leading: Icon(Icons.assignment, color: Colors.orange[300]),
+                title: Text('生态地质垂直剖面测量点林草调查表(灌木)'),
+                onTap: () => Navigator.pop(context, '4'),
+              ),
+              ListTile(
+                leading: Icon(Icons.assignment, color: Colors.orange[400]),
+                title: Text('生态地质垂直剖面测量点林草调查表(草木)'),
+                onTap: () => Navigator.pop(context, '5'),
               ),
             ],
           ),
@@ -761,7 +795,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       clickedLatLngGcj,
                       gcjPoint,
                     );
-                    if (distance < 1000 && distance < minDistance) {
+                    if (distance < 500 && distance < minDistance) {
                       // 50米容差
                       minDistance = distance;
                       closestLine = taskLine;
@@ -788,7 +822,6 @@ class _HomeScreenState extends State<HomeScreen> {
               //   backgroundColor: Colors.transparent, // 背景透明，只盖文字
               //   userAgentPackageName: 'com.LaputaMao.field_survey',
               // ),
-
               TileLayer(
                 // 1. 高德卫星纯影像底图图层
                 urlTemplate:
@@ -847,16 +880,26 @@ class _HomeScreenState extends State<HomeScreen> {
               //     );
               //   }).toList(),
               // ),
+              PolylineLayer(
+                polylines: _historyActualRoutes.map((historyRoutePoints) {
+                  return Polyline(
+                    points: historyRoutePoints
+                        .map((p) => _wgsToGcj(p))
+                        .toList(),
+                    strokeWidth: 5.0,
+                    color: Colors.green, // 实际被走完的轨迹用纯绿色
+                  );
+                }).toList(),
+              ),
 
-              // ---------------实际行走的绿色轨迹---------------
+              // ============ ⚠️ 你本次启动点击“开始调查”后的新产生轨迹 ============
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    // 同样，用户的实际轨迹也是 WGS84，渲染到高德图上时要转 GCJ02
-                    //todo points: _actualRoute.map((p) => _wgsToGcj(p)).toList(),
-                    points: _actualRoute.map((p) => p).toList(),
+                    points: _actualRoute.map((p) => _wgsToGcj(p)).toList(),
                     strokeWidth: 5.0,
-                    color: Colors.green,
+                    // 本次运行产生的新轨迹为了做区分，可以用稍微亮一点/有冲刺感的颜色（比如橘色或者深绿色）
+                    color: Colors.greenAccent,
                   ),
                 ],
               ),
@@ -926,7 +969,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 2. 真实打卡点(你在填表存库时存的是WGS84, _actualPoints 内提取 location 转 GCJ)
                   ..._actualPoints.asMap().entries.map(
                     (entry) => Marker(
-                      point: entry.value['location'], // todo转 GCJ
+                      point: _wgsToGcj(entry.value['location']),
+                      // todo转 GCJ
                       width: 45,
                       height: 45,
                       child: GestureDetector(
@@ -945,7 +989,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 3. 当前实时 GPS 小蓝点
                   if (_currentLocation != null)
                     Marker(
-                      point: _currentLocation!, // todo 转 GCJ
+                      point: _wgsToGcj(_currentLocation!), // todo 转 GCJ
                       width: 20,
                       height: 20,
                       child: Container(

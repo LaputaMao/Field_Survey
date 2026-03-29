@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:field_survey/config/api_config.dart';
 
 import 'home_screen.dart';
 
@@ -17,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // 请注意：如果你在Android模拟器上跑，本地电脑后端的IP应该是 10.0.2.2
   // 如果是真机调试，请写你电脑所在的局域网IP
-  final String _loginUrl = 'http://10.0.2.2:9096/api/v1/login';
+  final String _loginUrl = ApiConfig.loginUrl;
 
   Future<void> _login() async {
     String username = _usernameController.text.trim();

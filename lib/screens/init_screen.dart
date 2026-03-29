@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'login_screen.dart';
 import 'home_screen.dart';
+import 'package:field_survey/config/api_config.dart';
+
 
 class InitScreen extends StatefulWidget {
   @override
@@ -11,7 +13,7 @@ class InitScreen extends StatefulWidget {
 
 class _InitScreenState extends State<InitScreen> {
   // 注意保持 IP 为你的后端地址
-  final String _verifyUrl = 'http://10.0.2.2:9096/api/v1/verify-token';
+  final String _verifyUrl = ApiConfig.verifyTokenUrl;
 
   @override
   void initState() {
