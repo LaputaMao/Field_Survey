@@ -129,6 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // 2. 清理 SharedPreferences 中的 Token 和其他用户信息
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt_token');
+    await prefs.remove("username");
     // 如果你本地还存了诸如 user_id, 角色等也可以一并 remove:
     // await prefs.remove('user_id');
 
@@ -185,7 +186,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<String?> _captureMapSquare() async {
     try {
       // 1. 提取 RepaintBoundary 中的原始画面
-      RenderRepaintBoundary boundary = _mapKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      RenderRepaintBoundary boundary =
+          _mapKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
       // pixelRatio控制清晰度，2.0通常足够，3.0最清晰但文件大
       ui.Image rawImage = await boundary.toImage(pixelRatio: 2.0);
 
@@ -198,7 +200,12 @@ class _HomeScreenState extends State<HomeScreen> {
       Canvas canvas = Canvas(recorder);
 
       // 算偏离量以保证“居中”截取
-      Rect srcRect = Rect.fromLTWH((width - size) / 2.0, (height - size) / 2.0, size.toDouble(), size.toDouble());
+      Rect srcRect = Rect.fromLTWH(
+        (width - size) / 2.0,
+        (height - size) / 2.0,
+        size.toDouble(),
+        size.toDouble(),
+      );
       Rect dstRect = Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
 
       // 3. 在内存中将原始长图以正方形比例“画”出来
@@ -206,12 +213,15 @@ class _HomeScreenState extends State<HomeScreen> {
       ui.Image squareImage = await recorder.endRecording().toImage(size, size);
 
       // 4. 将图片转为 PNG 字节流
-      ByteData? byteData = await squareImage.toByteData(format: ui.ImageByteFormat.png);
+      ByteData? byteData = await squareImage.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
       if (byteData == null) return null;
 
       // 5. 将字节流存入本机的临时缓存文件夹
       final directory = await getTemporaryDirectory();
-      String fileName = "map_snapshot_${DateTime.now().millisecondsSinceEpoch}.png";
+      String fileName =
+          "map_snapshot_${DateTime.now().millisecondsSinceEpoch}.png";
       File file = File('${directory.path}/$fileName');
       await file.writeAsBytes(byteData.buffer.asUint8List());
 
@@ -383,8 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _isSurveying = true;
       _actualRoute.clear();
       _actualPoints.clear();
-      // _surveyStartTime = DateTime.now().toUtc();
-      _surveyStartTime = DateTime.now();
+      _surveyStartTime = DateTime.now().toUtc();
     });
 
     // 2. 开启位置实时监听
@@ -413,7 +422,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _surveyStartTime == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("缺少必要任务数据，无法上传")));
+      ).showSnackBar(SnackBar(content: Text("缺少必要任务数据，请确保规划路线处于选择(黄色高亮)状态")));
       return;
     }
 
@@ -455,8 +464,8 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         "start_time": _surveyStartTime!.toIso8601String(),
         // 例如 "2023-11-01T08:00:00.000Z"
-        // "end_time": DateTime.now().toUtc().toIso8601String(),
-        "end_time": DateTime.now().toIso8601String(),
+        "end_time": DateTime.now().toUtc().toIso8601String(),
+        // "end_time": DateTime.now().toIso8601String(),
       };
 
       // 4. 发起网络请求
@@ -493,11 +502,38 @@ class _HomeScreenState extends State<HomeScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text('上传失败：${response.statusCode}')));
       }
+      // } catch (e) {
+      //   Navigator.pop(context); // 关闭加载圈
+      //   ScaffoldMessenger.of(
+      //     context,
+      //   ).showSnackBar(SnackBar(content: Text('轨迹上传异常：$e')));
+      // }
+    } on DioException catch (dioError) {
+      // ⭐ 核心抓错逻辑：提取后端真正返回的 message
+      Navigator.pop(context); // 关加载圈
+      String errorMsg = "请求失败";
+
+      if (dioError.response != null) {
+        // 如果后端有返回具体 JSON 原因（比如 {"message": "task_id 不能为空"}）
+        final errorData = dioError.response?.data;
+        errorMsg =
+            "HTTP ${dioError.response?.statusCode}: ${errorData.toString()}";
+      } else {
+        errorMsg = dioError.message ?? "网络连接异常";
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('提交被拒绝:\n$errorMsg'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 5), // 显示久一点方便你看
+        ),
+      );
     } catch (e) {
-      Navigator.pop(context); // 关闭加载圈
+      Navigator.pop(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('轨迹上传异常：$e')));
+      ).showSnackBar(SnackBar(content: Text('未知错误: $e')));
     }
   }
 
@@ -511,6 +547,14 @@ class _HomeScreenState extends State<HomeScreen> {
       ).showSnackBar(SnackBar(content: Text("GPS信号弱，无法进行打点")));
       return;
     }
+    //增加用户自排查
+    if (_selectedLine == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("请确保规划路线处于选择(黄色高亮)状态")));
+      return;
+    }
+
     String? screenshotPath;
     // 需求2：点击打点后，先弹出模板选择器
     final String? selectedTemplate = await showModalBottomSheet<String>(
@@ -567,15 +611,23 @@ class _HomeScreenState extends State<HomeScreen> {
     String currentPathId = _selectedLine?.properties['线路号'] ?? "UNKNOWN";
 
     // ⭐ 新增：判断是否是需要截图的表单 (模块1 和 模块2)且属于新建打点
-    if ((selectedTemplate == '1' || selectedTemplate == '2') && existingPoint == null) {
+    if ((selectedTemplate == '1' || selectedTemplate == '2') &&
+        existingPoint == null) {
       // 1. 让地图相机瞬间移动到用户所在位置居中（转GCJ坐标以免移歪）
       _mapController.move(_wgsToGcj(_currentLocation!), 16.0);
 
       // 2. 弹一个加载黑框防止用户此时乱摸
       showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => Center(child: Card(child: Padding(padding: EdgeInsets.all(20), child: Text("正在生成空间位置截图..."))))
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Text("正在生成空间位置截图..."),
+            ),
+          ),
+        ),
       );
 
       // 3. 稍微等待几十毫秒，让地图渲染出新瓦片后执行物理截图
@@ -591,10 +643,14 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         fullscreenDialog: true, // 加上这个属性，动画会从下往上弹出，像一个系统的全屏工作表
         builder: (context) => FieldSurveyFormPage(
-          currentGps: _currentLocation!, // 将真实的GPS（WGS84）发给表单页面自动填进去
-          taskId: _currentTaskId!, // 传真实的TaskId
-          pathId: currentPathId, // 传路线号
-          templateType: selectedTemplate, // 将选中的模板类型传给表单页
+          currentGps: _currentLocation!,
+          // 将真实的GPS（WGS84）发给表单页面自动填进去
+          taskId: _currentTaskId!,
+          // 传真实的TaskId
+          pathId: currentPathId,
+          // 传路线号
+          templateType: selectedTemplate,
+          // 将选中的模板类型传给表单页
           // ⭐ 新增传参：把截图地址塞过去
           autoScreenshotPath: screenshotPath,
         ),
@@ -656,7 +712,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Icon(Icons.account_circle, size: 60, color: Colors.white),
                   SizedBox(height: 10),
                   Text(
-                    '野外调查员',
+                    '您好,调查员',
                     style: TextStyle(color: Colors.white, fontSize: 18),
                   ),
                 ],
@@ -685,11 +741,11 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             Divider(),
-            ListTile(
-              leading: Icon(Icons.settings),
-              title: Text('离线地图下载'), // 占位
-              onTap: () => Navigator.pop(context),
-            ),
+            // ListTile(
+            //   leading: Icon(Icons.settings),
+            //   title: Text('离线地图下载'), // 占位
+            //   onTap: () => Navigator.pop(context),
+            // ),
             ListTile(
               leading: Icon(Icons.logout, color: Colors.red),
               title: Text('退出登录', style: TextStyle(color: Colors.red)),

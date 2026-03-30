@@ -145,7 +145,7 @@ class _TaskScreenState extends State<TaskScreen> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text("确认上报完成?"),
-            content: Text("完成后该任务将流转至后台审核，请确认已上传所有必填点位。"),
+            content: Text("完成后该任务将流转至后台审核，请确认已上传本次任务所有规划路线。"),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -212,83 +212,226 @@ class _TaskScreenState extends State<TaskScreen> {
           ? Center(child: CircularProgressIndicator())
           : ListView.builder(
               itemCount: _tasks.length,
+              // itemBuilder: (context, index) {
+              //   final task = _tasks[index];
+              //   bool isUnread = !(task['is_read'] ?? true);
+              //   // 判断任务是否已完成（防止重复提交）
+              //   bool isCompleted = task['status'] == 'completed';
+              //
+              //   return Card(
+              //     margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              //     child: InkWell(
+              //       // 整张卡片可点击进入地图
+              //       onTap: () => _fetchTaskDetail(task),
+              //       child: Padding(
+              //         padding: const EdgeInsets.all(12.0),
+              //         child: Row(
+              //           children: [
+              //             if (isUnread)
+              //               Container(
+              //                 width: 10,
+              //                 height: 10,
+              //                 margin: EdgeInsets.only(right: 10),
+              //                 decoration: BoxDecoration(
+              //                   color: Colors.red,
+              //                   shape: BoxShape.circle,
+              //                 ),
+              //               )
+              //             else
+              //               SizedBox(width: 20),
+              //
+              //             Expanded(
+              //               child: Column(
+              //                 crossAxisAlignment: CrossAxisAlignment.start,
+              //                 children: [
+              //                   Text(
+              //                     '任务编号: ${task['id']}',
+              //                     style: TextStyle(
+              //                       fontWeight: FontWeight.bold,
+              //                       fontSize: 16,
+              //                     ),
+              //                   ),
+              //                   SizedBox(height: 6),
+              //                   Text(
+              //                     '派发时间: ${_formatDate(task['created_at'])}',
+              //                     style: TextStyle(color: Colors.grey[600]),
+              //                   ),
+              //                   Text(
+              //                     '状态: ${task['status']}',
+              //                     style: TextStyle(
+              //                       color: isCompleted
+              //                           ? Colors.blue
+              //                           : Colors.orange,
+              //                     ),
+              //                   ),
+              //                 ],
+              //               ),
+              //             ),
+              //
+              //             // 右侧的提交完成按钮
+              //             ElevatedButton.icon(
+              //               style: ElevatedButton.styleFrom(
+              //                 backgroundColor: isCompleted
+              //                     ? Colors.grey[300]
+              //                     : Colors.green,
+              //                 foregroundColor: isCompleted
+              //                     ? Colors.grey
+              //                     : Colors.white,
+              //                 elevation: 0,
+              //               ),
+              //               icon: Icon(
+              //                 isCompleted ? Icons.check : Icons.upload,
+              //               ),
+              //               label: Text(isCompleted ? "已完成" : "确认完成"),
+              //               onPressed: isCompleted
+              //                   ? null
+              //                   : () => _completeTask(task['id']),
+              //             ),
+              //           ],
+              //         ),
+              //       ),
+              //     ),
+              //   );
+              // },
               itemBuilder: (context, index) {
                 final task = _tasks[index];
                 bool isUnread = !(task['is_read'] ?? true);
-                // 判断任务是否已完成（防止重复提交）
                 bool isCompleted = task['status'] == 'completed';
 
                 return Card(
-                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: InkWell(
-                    // 整张卡片可点击进入地图
-                    onTap: () => _fetchTaskDetail(task),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Row(
-                        children: [
-                          if (isUnread)
-                            Container(
-                              width: 10,
-                              height: 10,
-                              margin: EdgeInsets.only(right: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                            )
-                          else
-                            SizedBox(width: 20),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // 1. 未读状态红点
+                        if (isUnread)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.only(right: 12),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
 
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '任务编号: ${task['id']}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                        // 2. 左侧：任务核心信息
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '任务编号: ${task['id']}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 17,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.calendar_today,
+                                    size: 14,
+                                    color: Colors.grey[600],
                                   ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _formatDate(task['created_at']),
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
                                 ),
-                                SizedBox(height: 6),
-                                Text(
-                                  '派发时间: ${_formatDate(task['created_at'])}',
-                                  style: TextStyle(color: Colors.grey[600]),
+                                decoration: BoxDecoration(
+                                  color:
+                                      (isCompleted
+                                              ? Colors.blue
+                                              : Colors.orange)
+                                          .withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
-                                Text(
-                                  '状态: ${task['status']}',
+                                child: Text(
+                                  isCompleted ? "已完成" : "进行中",
                                   style: TextStyle(
                                     color: isCompleted
                                         ? Colors.blue
                                         : Colors.orange,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
+                        ),
 
-                          // 右侧的提交完成按钮
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isCompleted
-                                  ? Colors.grey[300]
-                                  : Colors.green,
-                              foregroundColor: isCompleted
-                                  ? Colors.grey
-                                  : Colors.white,
-                              elevation: 0,
+                        // 3. 右侧：操作按钮组 (垂直排列)
+                        const SizedBox(width: 10),
+                        Column(
+                          children: [
+                            // 查看任务按钮
+                            SizedBox(
+                              width: 100,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue[700],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: () => _fetchTaskDetail(task),
+                                child: const Text("查看任务"),
+                              ),
                             ),
-                            icon: Icon(
-                              isCompleted ? Icons.check : Icons.upload,
+                            const SizedBox(height: 8),
+                            // 确认完成按钮
+                            SizedBox(
+                              width: 100,
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: isCompleted
+                                        ? Colors.grey
+                                        : Colors.green,
+                                  ),
+                                  foregroundColor: isCompleted
+                                      ? Colors.grey
+                                      : Colors.green,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onPressed: isCompleted
+                                    ? null
+                                    : () => _completeTask(task['id']),
+                                child: Text(isCompleted ? "已上报" : "确认完成"),
+                              ),
                             ),
-                            label: Text(isCompleted ? "已完成" : "确认完成"),
-                            onPressed: isCompleted
-                                ? null
-                                : () => _completeTask(task['id']),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 );

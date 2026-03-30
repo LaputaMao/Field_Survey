@@ -36,10 +36,112 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
   final Map<String, dynamic> _formData = {};
 
   // tip 二级下拉数据结构
-  final Map<String, List<String>> _categoryData = {
-    "植被": ["乔木", "灌木", "草本", "荒漠植被"],
-    "土壤": ["红壤", "黄壤", "棕壤", "粘土"],
-    "成土母质": ["残积物", "坡积物", "洪积物", "冲积物"],
+  //地貌部位
+  final Map<String, List<String>> _geomorphic = {
+    "丘陵山地起伏地形": ["坡顶(顶部)", "坡上(上部)", "坡中(中部)", "坡下(下部)", "坡麓(底部)"],
+    "平原或平坦地形": [
+      "高阶地(洪－冲积平原)",
+      "低阶地(河流冲积平原)",
+      "河漫滩",
+      "底部(排水线)",
+      "潮上带",
+      "潮间带",
+      "其他",
+    ],
+  };
+
+  //土地利用类型
+  final Map<String, List<String>> _landUse = {
+    "湿地": ["森林沼泽", "灌丛沼泽", "沼泽草地", "沼泽地", "内陆滩涂"],
+    "耕地": ["水田", "水浇地", "旱地"],
+    "园地": ["果园", "茶园", "其他园地"],
+    "林地": ["乔木林地", "竹林地", "灌木林地", "其他林地"],
+    "草地": ["天然牧草地", "人工牧草地", "其他草地"],
+    "商业服务业用地": ["其他城镇用地"],
+    "工矿用地": ["其他城镇用地"],
+    "住宅用地": ["住宅用地"],
+    "公共管理与公共服务用地": ["其他城镇用地"],
+    "特殊用地": ["其他城镇用地"],
+    "交通运输用地": ["其他城镇用地"],
+    "水域及水利设施用地": ["河流水面", "湖泊水面", "水库水面", "坑塘水面", "沟渠", "冰川及永久积雪"],
+    "其他土地": ["裸岩石砾地", "裸土地", "盐碱地", "沙地"],
+  };
+
+  //生态系统类型
+  final Map<String, List<String>> _ecosystem = {
+    "森林生态系统": ["阔叶林", "针叶林", "针阔混交林", "竹林", "灌木林", "其他林地"],
+    "草地生态系统": ["草甸", "草原", "草丛", "高寒稀疏植被与冻原", "人工（栽培）草地"],
+    "湿地生态系统": ["沼泽", "河流", "湖泊"],
+    "农田生态系统": ["耕地", "园地"],
+    "荒漠生态系统": ["荒漠"],
+    "城镇生态系统": ["城镇"],
+    "冰川及永久积雪": ["冰川及永久积雪"],
+    "裸地": ["裸地"],
+  };
+
+  //生态问题类型
+  final Map<String, List<String>> _ecoProblem = {
+    "土地退化": ["水土流失型（水力侵蚀）", "沙化型", "石漠化型", "冻融型", "盐渍化型"],
+    "生境退化": ["生境破碎化", "区域地下水位下降显著"],
+    "生态系统退化": ["森林退化", "草地退化", "湿地退化", "冰川退缩", "多年冻土消融"],
+    "生态系统服务退化": ["水土保持", "水源涵养", "防风固沙", "固碳"],
+  };
+
+  //成土母岩岩性
+  final Map<String, List<String>> _lithology = {
+    "沉积岩": [
+      "砾岩类",
+      " 砂岩类",
+      "粉砂岩类",
+      "页岩类",
+      "泥岩（粘土岩）类",
+      " 非蒸发岩类",
+      "蒸发岩类",
+      "可燃有机岩",
+      "松散堆积物",
+    ],
+    "火成岩": [
+      "超基性岩类侵入岩",
+      "基性岩类侵入岩",
+      "中性岩类侵入岩",
+      "酸性岩类侵入岩",
+      "碱性岩类侵入岩",
+      "煌斑岩类侵入岩",
+      "碳酸岩类侵入岩",
+      "脉岩",
+      "超基性熔岩类",
+      "基性熔岩类",
+      "中性熔岩类",
+      "酸性熔岩类",
+      "碱性熔岩类",
+      "流纹质火山岩（火山碎屑岩）类",
+      "英安质火山岩（火山碎屑岩）类",
+      "粗面质火山岩（火山碎屑岩）类",
+      "安山质火山岩（火山碎屑岩）类",
+      "玄武质火山岩（火山碎屑岩）类",
+      "安粗质火山岩（火山碎屑岩）类",
+      "玄武安山质火山岩（火山碎屑岩）类",
+      "粗面玄武质火山岩（火山碎屑岩）类",
+      "响岩质火山岩（火山碎屑岩）类",
+      "超镁铁质火山岩（火山碎屑岩）类",
+    ],
+    "变质岩": [
+      "板岩类",
+      "千枚岩类",
+      "片岩类",
+      "片麻岩类",
+      "麻粒岩类",
+      "浅粒岩-变粒岩类",
+      "斜长角闪岩类",
+      "大理岩类",
+      "榴辉岩类",
+      "角岩类",
+      "矽卡岩类",
+      "构造岩",
+      "糜棱岩",
+      "混合岩",
+      "其他变质岩类",
+    ],
   };
 
   // 模块3的内部标签页控制器
@@ -122,7 +224,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
     return value?.toString() ?? "";
   }
 
-  // ============== 新增：混合打点上传逻辑 ==============
+  //tip ============== HTTP：混合打点上传逻辑 ==============
   Future<void> _submitForm() async {
     // 弹出加载圈
     showDialog(
@@ -220,6 +322,8 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         // "path_id": widget.pathId, // (可选) 如果你上传点位接口也需要关联某条线，可以传这个
         "lon": widget.currentGps.longitude,
         "lat": widget.currentGps.latitude,
+        "path_id": widget.pathId,
+        "type": widget.templateType,
         // 所有纯文本统一转化为一个大 JSON 字符串
         "properties": jsonEncode(textData),
       });
@@ -276,9 +380,58 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
     }
   }
 
+  //TIP ============== HTTP：获取递增编号 next_code ==============
+  Future<void> _fetchNextCode() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('jwt_token');
+      String? username = prefs.getString('username');
+      var dio = Dio();
+
+      var response = await dio.get(
+        "$_baseUrl/user/points/next-number",
+        queryParameters: {
+          "task_id": widget.taskId,
+          "path_id": widget.pathId,
+          "type": widget.templateType,
+        },
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+
+      if (response.statusCode == 200 &&
+          response.data['data']['next_code'] != null) {
+        String nextCode = response.data['data']['next_code'].toString();
+
+        setState(() {
+          // ==========================================
+          // ⭐ 小鱼，在这里写你自己分模板拼接的逻辑！
+          // ==========================================
+          _formData['调查人'] = username;
+          _formData['记录人'] = username;
+
+          if (widget.templateType == '1') {
+            _formData['点号'] = "生态区编号-${widget.pathId}-D$nextCode";
+          } else if (widget.templateType == '2') {
+            _formData['剖面号'] = "生态区编号-${widget.pathId}-P$nextCode";
+          } else if (widget.templateType == '3') {
+            _formData['样地号'] = "生态区编号-${widget.pathId}-YD$nextCode";
+          } else {
+            _formData['样方号'] = "生态区编号-${widget.pathId}-YF$nextCode";
+          }
+          // ==========================================
+        });
+      }
+    } catch (e) {
+      debugPrint("获取编号失败: $e");
+      // 失败的话给个默认提示，允许手改
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    // 触发独立自增编号拉取
+    _fetchNextCode();
     _initAutoFields();
     //开启异步懒加载后台经纬度相交计算数据
     _fetchAutoFillData();
@@ -343,8 +496,6 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       '景观描述内容':
           '剖面点所处区域生态景观及突出的生态特征、生态问题的照片。描述内容：\n1、区域自然条件：描述该地理位置、气候区等整体特征；\n2、植被：植被类型、垂直结构及覆盖度等；\n3、生态系统及土地利用类型：描述生态系统类型、分布，土地利用类型、分布等；\n4、生态问题：生态问题类型、程度、分布、人类活动扰动、保护修复措施。',
       // 模块5
-      '调查人': '李四',
-      '记录人': '李四',
       '审核人': '',
 
       // 照片数据列表初始化
@@ -374,23 +525,15 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       // ---- 调查点记录表 专属初始化 ----
       _formData.addAll({
         // 初始化调查点独有的照片或组
-        '点号': '生态区编号-${widget.pathId}-D',
       });
     } else if (widget.templateType == '2') {
       // ---- 生态地质垂直剖面测量记录表 专属初始化 (保留你原来写好的) ----
-      _formData.addAll({
-        // 初始化调查点独有的照片或组
-        '剖面号': '生态区编号-${widget.pathId}-P',
-      });
     } else if (widget.templateType == '3') {
       // ---- 林草调查表 专属初始化 ----
-      _formData.addAll({'样地号': '生态区编号-${widget.pathId}-YD'});
     } else if (widget.templateType == '4') {
       // ---- 林草调查表 专属初始化 ----
-      _formData.addAll({'样方号': '生态区编号-${widget.pathId}-YF'});
     } else if (widget.templateType == '5') {
       // ---- 林草调查表 专属初始化 ----
-      _formData.addAll({'样方号': '生态区编号-${widget.pathId}-YF'});
     }
   }
 
@@ -646,7 +789,8 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                       onTap: () {
                         setState(() {
                           // 存储最终结果，例如 "植被: 乔木"
-                          map[label] = "$category: $item";
+                          // map[label] = "$category: $item";
+                          map[label] = item;
                         });
                         Navigator.pop(context);
                       },
@@ -846,43 +990,21 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                     ],
                   ),
                   // todo 在这里，我们就组装你需要的结构体了！将 itemMap 传入 targetMap
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDropdown('生态问题类型', [
-                          '水土流失型',
-                          '沙化型',
-                          '石漠化型',
-                          '冻融型',
-                          '盐渍化型',
-                          '生境破碎化',
-                          '区域地下水位下降显著',
-                          '森林退化',
-                          '草地退化',
-                          '湿地退化',
-                          '冰川退缩',
-                          '多年冻土消融',
-                          '水土保持',
-                          '水源涵养',
-                          '防风固沙',
-                          '固碳',
-                        ], targetMap: itemMap),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: _buildDropdown('生态问题程度', [
-                          '微度',
-                          '轻度',
-                          '中度',
-                          '强度',
-                          '极强度',
-                          '剧烈',
-                          '重度',
-                          '极重度',
-                        ], targetMap: itemMap),
-                      ),
-                    ],
+                  _buildLinkedDropdown(
+                    '生态问题类型',
+                    _ecoProblem,
+                    targetMap: itemMap,
                   ),
+                  _buildDropdown('生态问题程度', [
+                    '微度',
+                    '轻度',
+                    '中度',
+                    '强度',
+                    '极强度',
+                    '剧烈',
+                    '重度',
+                    '极重度',
+                  ], targetMap: itemMap),
                   _buildDropdown('生态问题影响因素', [
                     '人为',
                     '天然',
@@ -947,6 +1069,35 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
 
     // 这里不再写死，而是根据传入的 listKey 去拿数据
     List<Map<String, dynamic>> dynamicAssets = _formData[listKey];
+
+    // 1. 智能推断前缀和标题 (根据你传入的 dynamic_assets_sample_X 下标区分)
+    String categoryCode = 'X';
+    String title = '未知样品';
+
+    // 按照你之前的 7 个 tab 下标推断归属：
+    if (listKey.endsWith('_0')) {
+      categoryCode = 'B';
+      title = '植被样品';
+    } else if (listKey.endsWith('_1')) {
+      categoryCode = 'T';
+      title = '土壤样品';
+    } else if (listKey.endsWith('_2')) {
+      categoryCode = 'Z';
+      title = '成土母质样品';
+    } else if (listKey.endsWith('_3')) {
+      categoryCode = 'Q';
+      title = '包气带样品';
+    } // 注：包气带甲方若没定字母，先用Q代替
+    else if (listKey.endsWith('_4')) {
+      categoryCode = 'F';
+      title = '风化壳样品';
+    } else if (listKey.endsWith('_5')) {
+      categoryCode = 'Y';
+      title = '成土母岩样品';
+    } else if (listKey.endsWith('_6')) {
+      categoryCode = 'S';
+      title = '水样品';
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -969,7 +1120,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        "样品 #${index + 1}",
+                        "$title #${index + 1}",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.orange[900],
@@ -983,17 +1134,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                     ],
                   ),
                   // todo 在这里，我们就组装你需要的结构体了！将 itemMap 传入 targetMap
-                  Row(
-                    children: [
-                      // Expanded(
-                      //   child: _buildDropdown('样品类型', ['表层土样', '深层土样', '岩石样']),
-                      // ),
-                      // SizedBox(width: 8),
-                      Expanded(
-                        child: _buildInput('采样深度(cm)', targetMap: itemMap),
-                      ),
-                    ],
-                  ),
+                  _buildInput('采样深度(cm)', targetMap: itemMap),
                   _buildInput('样品编号', targetMap: itemMap),
                   _buildPhotoField('样品照片', '照片_记录', targetMap: itemMap),
                 ],
@@ -1008,7 +1149,26 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             setState(() {
               // 每当点击，就往动态列表里塞一个空字典和特有的照片List。
               // 上面的 .map 就会渲染出多一个卡片！
+              // ⭐ 核心算法：提取当前用户表单中的主编号
+              // 小鱼，这里按照优先级，获取 剖面号 > 点号 > 样地号
+              // 如果都还没取到（比如刚进页面请求还没回来），就默认前缀为 "TEMP"
+              String baseNumber =
+                  _formData['剖面号'] ??
+                  _formData['点号']
+                  // ?? _formData['样方号']
+                  // ?? _formData['样地号']
+                  ??
+                  "TEMP";
+
+              // 发射编号：当前分类中有多少个数据，就加1，并补齐为 3位 (例如 001)
+              int nextIndex = dynamicAssets.length + 1;
+              String seqStr = nextIndex.toString().padLeft(3, '0');
+
+              // 终极拼接：主号 + 模块定名字母 + 序号。 例如：R1-P001-T001
+              String finalSampleCode = "$baseNumber-$categoryCode$seqStr";
+
               dynamicAssets.add(<String, dynamic>{
+                '样品编号': finalSampleCode,
                 '时间记录': DateTime.now().toString().substring(0, 16),
                 '照片_记录': <Map<String, String>>[],
               });
@@ -1101,7 +1261,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             children: [
               Expanded(child: _buildAutoBox('路线号')),
               SizedBox(width: 8),
-              Expanded(flex: 2, child: _buildAutoBox('剖面号')),
+              Expanded(flex: 2, child: _buildAutoBox('点号')),
             ],
           ),
           _buildAutoBox('经度/纬度'),
@@ -1127,22 +1287,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             children: [
               Expanded(child: _buildAutoBox('地貌类型')),
               SizedBox(width: 8),
-              Expanded(
-                child: _buildDropdown('地貌部位', [
-                  '坡顶(顶部)',
-                  '坡上(上部)',
-                  '坡中(中部)',
-                  '坡下(下部)',
-                  '坡麓(底部)',
-                  '高阶地(洪－冲积平原)',
-                  '低阶地(河流冲积平原)',
-                  '河漫滩',
-                  '底部(排水线)',
-                  '潮上带',
-                  '潮间带',
-                  '其他',
-                ]),
-              ),
+              Expanded(child: _buildLinkedDropdown('地貌部位', _geomorphic)),
             ],
           ),
           Row(
@@ -1155,9 +1300,9 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
           _buildAutoBox('所属流域'),
           Row(
             children: [
-              Expanded(child: _buildLinkedDropdown('土地利用类型', _categoryData)),
+              Expanded(child: _buildLinkedDropdown('土地利用类型', _landUse)),
               SizedBox(width: 8),
-              Expanded(child: _buildAutoBox('生态系统类型')),
+              Expanded(child: _buildLinkedDropdown('生态系统类型', _ecosystem)),
             ],
           ),
           Row(
@@ -1169,222 +1314,10 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
               Expanded(child: _buildAutoBox('多年平均降水量')),
             ],
           ),
-          // _buildDropdown('生态问题类型/程度等级', [
-          //   '水土流失 - 轻度',
-          //   '水土流失 - 重度',
-          //   '沙化 - 轻度',
-          //   '石漠化',
-          // ]),
-          // _buildDropdown('影响因素', ['气候变化', '人类活动', '地质灾害', '综合因素']),
-          // _buildInput('修复措施'),
           _buildDynamicCustomGroup_ecoProblem(),
         ],
       ),
 
-      // ================= 模块 3: 详细特征观测 =================
-      // ExpansionTile(
-      //   initiallyExpanded: true, // 核心模块默认展开
-      //   maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
-      //   title: Text('特征模块', style: TextStyle(fontWeight: FontWeight.bold)),
-      //   children: [
-      //     // 使用横向分段控件选择 A/B/C
-      //     Wrap(
-      //       spacing: 8.0, // 左右间距
-      //       runSpacing: 4.0, // 上下间距（换行后）
-      //       children: List<Widget>.generate(7, (int index) {
-      //         final labels = ['植被', '土壤', '成土母质', '包气带', '风化壳', '成土母岩', '水'];
-      //         return ChoiceChip(
-      //           label: Text(labels[index]),
-      //           selected: _module3CurrentTab == index,
-      //           onSelected: (bool selected) {
-      //             setState(() {
-      //               _module3CurrentTab = selected ? index : _module3CurrentTab;
-      //             });
-      //           },
-      //         );
-      //       }).toList(),
-      //     ),
-      //     SizedBox(height: 10),
-      //
-      //     // ⭐ 修改：用 IndexedStack 包裹所有的面板层！
-      //     IndexedStack(
-      //       index: _module3CurrentTab, // 当前显示第几个
-      //       children: [
-      //         // 标签面板 A: 植被特征
-      //         if (_module3CurrentTab == 0) ...[
-      //           Row(
-      //             children: [
-      //               Expanded(flex: 3, child: _buildAutoBox('植被类型')),
-      //               SizedBox(width: 8),
-      //               Expanded(flex: 3, child: _buildInput('植被覆盖度(%)')),
-      //               SizedBox(width: 8),
-      //               Expanded(flex: 2, child: _buildInput('高度(m)')),
-      //             ],
-      //           ),
-      //           _buildDropdown('起源', ['自然植被', '人工植被']),
-      //           Row(
-      //             children: [
-      //               Expanded(child: _buildInput('植被优势种')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('乡土适生种')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('引进适生种')),
-      //             ],
-      //           ),
-      //           _buildDynamicCustomGroup_sample("dynamic_assets_sample_0"),
-      //         ],
-      //
-      //         // 标签面板 B: 土壤特征
-      //         if (_module3CurrentTab == 1) ...[
-      //           // _buildAutoBox('土壤类型/侵蚀/强度'),
-      //           Row(
-      //             children: [
-      //               Expanded(child: _buildAutoBox('土壤类型')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildAutoBox('侵蚀类型')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildAutoBox('侵蚀强度')),
-      //             ],
-      //           ),
-      //           Row(
-      //             children: [
-      //               Expanded(child: _buildInput('土壤颜色')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('厚度(cm)')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('土被覆盖率')),
-      //             ],
-      //           ),
-      //           _buildInput('分层结构'),
-      //           _buildInput('土壤质地'),
-      //           // Row(
-      //           //   children: [
-      //           //     Expanded(child: _buildInput('紧实度')),
-      //           //     SizedBox(width: 8),
-      //           //     Expanded(child: _buildInput('结持性')),
-      //           //     SizedBox(width: 8),
-      //           //     Expanded(child: _buildInput('砾石含量(%)')),
-      //           //   ],
-      //           // ),
-      //           // Row(
-      //           //   children: [
-      //           //     Expanded(child: _buildInput('pH值')),
-      //           //     SizedBox(width: 8),
-      //           //     Expanded(child: _buildInput('温度(℃)')),
-      //           //     SizedBox(width: 8),
-      //           //     Expanded(child: _buildInput('含水量')),
-      //           //   ],
-      //           // ),
-      //           // Row(
-      //           //   children: [
-      //           //     Expanded(child: _buildInput('电导率')),
-      //           //     SizedBox(width: 8),
-      //           //     Expanded(child: _buildInput('含盐量')),
-      //           //   ],
-      //           // ),
-      //           _buildDynamicCustomGroup_sample("dynamic_assets_sample_1"),
-      //         ],
-      //
-      //         // 标签面板 C: 母质特征
-      //         if (_module3CurrentTab == 2) ...[
-      //           Row(
-      //             children: [
-      //               Expanded(
-      //                 child: _buildDropdown('母质类型', [
-      //                   '风积沙',
-      //                   '原生黄土',
-      //                   '黄土状物质 (次生黄土)',
-      //                   '残积物',
-      //                   '坡积物',
-      //                   '冲积物',
-      //                   '海岸沉积物',
-      //                   '湖泊沉积物',
-      //                   '河流沉积物',
-      //                   '火成碎屑沉积物',
-      //                   '冰川沉积物 (冰碛物)',
-      //                   '冰水沉积物',
-      //                   '有机沉积物',
-      //                   '崩积物',
-      //                   '(古) 红黏土',
-      //                   '其他',
-      //                 ]),
-      //               ),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('颜色')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('厚度(m)')),
-      //             ],
-      //           ),
-      //           Row(
-      //             children: [
-      //               Expanded(child: _buildInput('成土母质层结构')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('成土母质松散度')),
-      //             ],
-      //           ),
-      //           _buildInput('成土母质成分及比例'),
-      //           Divider(),
-      //           // Text('包气带与风化壳', style: TextStyle(color: Colors.grey)),
-      //           _buildDynamicCustomGroup_sample("dynamic_assets_sample_2"),
-      //         ],
-      //
-      //         if (_module3CurrentTab == 3) ...[
-      //           Row(
-      //             children: [
-      //               Expanded(child: _buildInput('包气带厚度(m)')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('包气带渗透系数')),
-      //             ],
-      //           ),
-      //           _buildInput('包气带垂直结构'),
-      //           _buildDynamicCustomGroup_sample("dynamic_assets_sample_3"),
-      //         ],
-      //
-      //         if (_module3CurrentTab == 4) ...[
-      //           Row(
-      //             children: [
-      //               Expanded(child: _buildInput('风化壳类型')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('风化壳厚度')),
-      //             ],
-      //           ),
-      //           Row(
-      //             children: [
-      //               Expanded(child: _buildInput('风化壳风化程度')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('风化壳垂直结构')),
-      //             ],
-      //           ),
-      //           _buildDynamicCustomGroup_sample("dynamic_assets_sample_4"),
-      //         ],
-      //
-      //         if (_module3CurrentTab == 5) ...[
-      //           Row(
-      //             children: [
-      //               Expanded(child: _buildInput('成土母岩岩性')),
-      //               SizedBox(width: 8),
-      //               Expanded(child: _buildInput('成土母岩颜色')),
-      //             ],
-      //           ),
-      //           _buildDynamicCustomGroup_sample("dynamic_assets_sample_5"),
-      //         ],
-      //
-      //         if (_module3CurrentTab == 6) ...[
-      //           _buildDynamicCustomGroup_sample("dynamic_assets_sample_6"),
-      //         ],
-      //       ],
-      //     ),
-      //     // Text('水', style: TextStyle(
-      //     //   fontSize: 20,
-      //     //   color: Colors.green[800],
-      //     //   fontWeight: FontWeight.bold,
-      //     // )),
-      //     // Text('', style: TextStyle()),
-      //   ],
-      // ),
-
-      // ================= 模块 4: 采样与影像资料 =================
-      // ================= 模块 3: 详细特征观测 =================
       ExpansionTile(
         initiallyExpanded: true,
         maintainState: true, // ⭐ 保证收起折叠面板时内部数据死死保留不销毁！
@@ -1506,12 +1439,26 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildDropdown('成土母质类型', [
+                    '风积沙',
+                    '原生黄土',
+                    '黄土状物质 (次生黄土)',
+                    '残积物',
+                    '坡积物',
+                    '冲积物',
+                    '海岸沉积物',
+                    '湖泊沉积物',
+                    '河流沉积物',
+                    '火成碎屑沉积物',
+                    '冰川沉积物 (冰碛物)',
+                    '冰水沉积物',
+                    '有机沉积物',
+                    '崩积物',
+                    '(古) 红黏土',
+                    '其他',
+                  ]),
                   Row(
                     children: [
-                      Expanded(
-                        child: _buildDropdown('母质类型', ['风积沙', '原生黄土']),
-                      ), // 选项可自行补全
-                      SizedBox(width: 8),
                       Expanded(child: _buildInput('颜色')),
                       SizedBox(width: 8),
                       Expanded(child: _buildInput('厚度(m)')),
@@ -1572,13 +1519,8 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(child: _buildInput('成土母岩岩性')),
-                      SizedBox(width: 8),
-                      Expanded(child: _buildInput('成土母岩颜色')),
-                    ],
-                  ),
+                  _buildLinkedDropdown("成土母岩岩性", _lithology),
+                  _buildInput('成土母岩颜色'),
                   _buildDynamicCustomGroup_sample("dynamic_assets_sample_5"),
                 ],
               ),
@@ -1687,7 +1629,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             children: [
               Expanded(child: _buildAutoBox('路线号')),
               SizedBox(width: 8),
-              Expanded(child: _buildAutoBox('剖面号')),
+              Expanded(flex: 2, child: _buildAutoBox('剖面号')),
             ],
           ),
           _buildAutoBox('经度/纬度'),
@@ -1713,22 +1655,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             children: [
               Expanded(child: _buildAutoBox('地貌类型')),
               SizedBox(width: 8),
-              Expanded(
-                child: _buildDropdown('地貌部位', [
-                  '坡顶(顶部)',
-                  '坡上(上部)',
-                  '坡中(中部)',
-                  '坡下(下部)',
-                  '坡麓(底部)',
-                  '高阶地(洪－冲积平原)',
-                  '低阶地(河流冲积平原)',
-                  '河漫滩',
-                  '底部(排水线)',
-                  '潮上带',
-                  '潮间带',
-                  '其他',
-                ]),
-              ),
+              Expanded(child: _buildLinkedDropdown('地貌部位', _geomorphic)),
             ],
           ),
           Row(
@@ -1741,9 +1668,9 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
           // _buildAutoBox('土地利用/生态系统类型'),
           Row(
             children: [
-              Expanded(child: _buildAutoBox('土地利用类型')),
+              Expanded(child: _buildLinkedDropdown('土地利用类型', _landUse)),
               SizedBox(width: 8),
-              Expanded(child: _buildAutoBox('生态系统类型')),
+              Expanded(child: _buildLinkedDropdown('生态系统类型', _ecosystem)),
             ],
           ),
           Row(
@@ -1755,14 +1682,6 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
               Expanded(child: _buildAutoBox('多年平均降水量')),
             ],
           ),
-          // _buildDropdown('生态问题类型/程度等级', [
-          //   '水土流失 - 轻度',
-          //   '水土流失 - 重度',
-          //   '沙化 - 轻度',
-          //   '石漠化',
-          // ]),
-          // _buildDropdown('影响因素', ['气候变化', '人类活动', '地质灾害', '综合因素']),
-          // _buildInput('修复措施'),
           _buildDynamicCustomGroup_ecoProblem(),
         ],
       ),
@@ -1890,12 +1809,26 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildDropdown('成土母质类型', [
+                    '风积沙',
+                    '原生黄土',
+                    '黄土状物质 (次生黄土)',
+                    '残积物',
+                    '坡积物',
+                    '冲积物',
+                    '海岸沉积物',
+                    '湖泊沉积物',
+                    '河流沉积物',
+                    '火成碎屑沉积物',
+                    '冰川沉积物 (冰碛物)',
+                    '冰水沉积物',
+                    '有机沉积物',
+                    '崩积物',
+                    '(古) 红黏土',
+                    '其他',
+                  ]),
                   Row(
                     children: [
-                      Expanded(
-                        child: _buildDropdown('母质类型', ['风积沙', '原生黄土']),
-                      ), // 选项可自行补全
-                      SizedBox(width: 8),
                       Expanded(child: _buildInput('颜色')),
                       SizedBox(width: 8),
                       Expanded(child: _buildInput('厚度(m)')),
@@ -1956,13 +1889,8 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(child: _buildInput('成土母岩岩性')),
-                      SizedBox(width: 8),
-                      Expanded(child: _buildInput('成土母岩颜色')),
-                    ],
-                  ),
+                  _buildLinkedDropdown("成土母岩岩性", _lithology),
+                  _buildInput('成土母岩颜色'),
                   _buildDynamicCustomGroup_sample("dynamic_assets_sample_5"),
                 ],
               ),
@@ -2097,57 +2025,45 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       ExpansionTile(
         initiallyExpanded: true,
         maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
-        title: Text('样方登记模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text('样方取样模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [_buildPhotoField('林草样方照片', '林草样方照片')],
+      ),
+      ExpansionTile(
+        initiallyExpanded: true,
+        maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
+        title: Text('样方记录模块', style: TextStyle(fontWeight: FontWeight.bold)),
         children: [
-          ExpansionTile(
-            initiallyExpanded: true,
-            maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
-            title: Text(
-              '样方取样模块',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            children: [_buildPhotoField('林草样方照片', '林草样方照片')],
-          ),
-          ExpansionTile(
-            initiallyExpanded: true,
-            maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
-            title: Text(
-              '样方记录模块',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+          Text(''),
+          Row(
             children: [
-              Text(''),
-              Row(
-                children: [
-                  Expanded(flex: 2, child: _buildAutoBox('样方号')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('灌木样方面积')),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(child: _buildInput('优势种')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildInput('覆盖度%')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildInput('平均高(m)')),
-                ],
-              ),
-              _buildInput('根系发育深度'),
-              _buildInput('林草样方总体描述'),
-              Row(
-                children: [
-                  Expanded(child: _buildAutoBox('调查人')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('记录人')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('审核人')),
-                ],
-              ),
+              Expanded(flex: 2, child: _buildAutoBox('样方号')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('灌木样方面积')),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildInput('优势种')),
+              SizedBox(width: 8),
+              Expanded(child: _buildInput('覆盖度%')),
+              SizedBox(width: 8),
+              Expanded(child: _buildInput('平均高(m)')),
+            ],
+          ),
+          _buildInput('根系发育深度'),
+          _buildInput('林草样方总体描述'),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('调查人')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('记录人')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('审核人')),
             ],
           ),
         ],
       ),
+
       SizedBox(height: 50),
     ];
   }
@@ -2158,57 +2074,45 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       ExpansionTile(
         initiallyExpanded: true,
         maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
-        title: Text('样方登记模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text('样方取样模块', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: [_buildPhotoField('林草样方照片', '林草样方照片')],
+      ),
+      ExpansionTile(
+        initiallyExpanded: true,
+        maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
+        title: Text('样方记录模块', style: TextStyle(fontWeight: FontWeight.bold)),
         children: [
-          ExpansionTile(
-            initiallyExpanded: true,
-            maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
-            title: Text(
-              '样方取样模块',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            children: [_buildPhotoField('林草样方照片', '林草样方照片')],
-          ),
-          ExpansionTile(
-            initiallyExpanded: true,
-            maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
-            title: Text(
-              '样方记录模块',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+          Text(''),
+          Row(
             children: [
-              Text(''),
-              Row(
-                children: [
-                  Expanded(flex: 2, child: _buildAutoBox('样方号')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('草木样方面积')),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(child: _buildInput('优势种')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildInput('覆盖度%')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildInput('平均高(m)')),
-                ],
-              ),
-              _buildInput('根系发育深度'),
-              _buildInput('林草样方总体描述'),
-              Row(
-                children: [
-                  Expanded(child: _buildAutoBox('调查人')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('记录人')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildAutoBox('审核人')),
-                ],
-              ),
+              Expanded(flex: 2, child: _buildAutoBox('样方号')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('草木样方面积')),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(child: _buildInput('优势种')),
+              SizedBox(width: 8),
+              Expanded(child: _buildInput('覆盖度%')),
+              SizedBox(width: 8),
+              Expanded(child: _buildInput('平均高(m)')),
+            ],
+          ),
+          _buildInput('根系发育深度'),
+          _buildInput('林草样方总体描述'),
+          Row(
+            children: [
+              Expanded(child: _buildAutoBox('调查人')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('记录人')),
+              SizedBox(width: 8),
+              Expanded(child: _buildAutoBox('审核人')),
             ],
           ),
         ],
       ),
+
       SizedBox(height: 50),
     ];
   }

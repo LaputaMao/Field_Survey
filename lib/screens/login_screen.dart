@@ -47,12 +47,14 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.statusCode == 200) {
         // 登录成功，保存 Token
         String token = responseData['token'];
+        String username = responseData['user']['username'] ?? "默认用户";
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', token);
+        await prefs.setString('username', username);
 
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('登录成功！')));
+        ).showSnackBar(SnackBar(content: Text('欢迎回来，$username！')));
 
         // Navigator.pushReplacementNamed(context, '/home');
         if (mounted) {
