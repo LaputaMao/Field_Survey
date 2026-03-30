@@ -7,6 +7,8 @@ import 'package:dio/dio.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:field_survey/config/api_config.dart';
+import 'package:proj4dart/proj4dart.dart';
+import 'dart:math' as math;
 
 class FieldSurveyFormPage extends StatefulWidget {
   final LatLng currentGps; // 传入GPS位置
@@ -32,6 +34,13 @@ class FieldSurveyFormPage extends StatefulWidget {
 class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
   // 一个大 Map，用于在内存里装载所有用户填写的、自动生成的数据
   final Map<String, dynamic> _formData = {};
+
+  // tip 二级下拉数据结构
+  final Map<String, List<String>> _categoryData = {
+    "植被": ["乔木", "灌木", "草本", "荒漠植被"],
+    "土壤": ["红壤", "黄壤", "棕壤", "粘土"],
+    "成土母质": ["残积物", "坡积物", "洪积物", "冲积物"],
+  };
 
   // 模块3的内部标签页控制器
   int _module3CurrentTab = 0;
@@ -279,10 +288,30 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
   void _initAutoFields() {
     String today =
         "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
+    double currentLon = widget.currentGps.longitude;
+    double currentLat = widget.currentGps.latitude;
 
-    // todo 自动填写数据
+    // 1. 定义源坐标系 (WGS84 GPS原始坐标)
+    var projWGS84 = Projection.get('EPSG:4326')!;
+
+    // 2. 注册并定义目标坐标系：CGCS2000 3度带 (举例：中央经线120度，EPSG代码为4528)
+    // 小鱼注意：不同省份的中央经线不同！如果是全国通用的项目，可能需要根据当前经度动态计算 EPSG 编号。
+    // 这里填入的字符串是标准的 proj4 通用定义，可以在 epsg.io 上查到。
+    String cgcs2000Proj4Def =
+        "+proj=tmerc +lat_0=0 +lon_0=120 +k=1 +x_0=39500000 +y_0=0 +ellps=GRS80 +units=m +no_defs";
+    var projCGCS2000 = Projection.add('EPSG:4528', cgcs2000Proj4Def);
+
+    // 3. 执行转换
+    var pointWGS = Point(x: currentLon, y: currentLat);
+    var pointPlanar = projWGS84.transform(projCGCS2000, pointWGS);
+
+    // 4. 拼装字符串
+    String planarString =
+        'X: ${pointPlanar.x.toStringAsFixed(3)} m,  Y: ${pointPlanar.y.toStringAsFixed(3)} m';
+
     // 1. 三套模板都要用到的【公共基础字段】
     _formData.addAll({
+      '表格模板编号': '${widget.templateType}',
       // // 模块0
       // '剖面特征描述': '无',
       // // 模块1
@@ -294,7 +323,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       '经度/纬度':
           'E:${widget.currentGps.longitude.toStringAsFixed(8)} / N:${widget.currentGps.latitude.toStringAsFixed(8)}',
       // '地面高程': '58 m',
-      // '平面坐标': 'X:3432123, Y:4123412',
+      '平面坐标': planarString,
       // '地理位置': '北京市海淀区',
       // // 模块2
       // '地貌类型': '低海拔平原',
@@ -308,13 +337,15 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       // '土壤类型': '铁铝土-湿热铁铝土-砖红壤',
       // '侵蚀类型': '水力侵蚀',
       // '侵蚀强度': '微度',
-      // // 模块4
-      // '柱状剖面描述': '无',
-      // '景观描述内容': '无',
-      // // 模块5
-      // '调查人': '李四',
-      // '记录人': '李四',
-      // '审核人': '',
+      // 模块4Projection.get('EPSG:4549')!
+      '柱状剖面描述':
+          '植被：描述植被类型、林草覆盖度、优势植物种，植被根系发育深度等；\n土壤：描述土体构型特征、土壤层颜色、厚度、质地、结构、砾石含量、含水率、pH值、根系深度、根系分布特征，表层土壤侵蚀程度，与下覆成土母质接触关系；\n成土母质：描述成土母质类型、厚度、结构、垂向变化、根系分布特征及与下覆基岩的接触关系等；\n成土母岩：描述岩性、主要岩石颜色、结构、构造、主要矿物、层理/节理产状、抗风化能力等；\n包气带：描述厚度、结构、含水性、渗透系数及分布特征等；\n风化壳：描述类型、厚度、风化程度、物质组成、垂直结构、分布特征等；\n总结描述成土岩石-成土母质-土壤-植被间关系、影响等。',
+      '景观描述内容':
+          '剖面点所处区域生态景观及突出的生态特征、生态问题的照片。描述内容：\n1、区域自然条件：描述该地理位置、气候区等整体特征；\n2、植被：植被类型、垂直结构及覆盖度等；\n3、生态系统及土地利用类型：描述生态系统类型、分布，土地利用类型、分布等；\n4、生态问题：生态问题类型、程度、分布、人类活动扰动、保护修复措施。',
+      // 模块5
+      '调查人': '李四',
+      '记录人': '李四',
+      '审核人': '',
 
       // 照片数据列表初始化
       '照片_柱状剖面图': <Map<String, String>>[],
@@ -377,6 +408,12 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       child: TextFormField(
         key: ValueKey("${map.hashCode}_auto_${label}_${map[label]}"),
         // ⭐ 新增：这把钥匙用字典的内存地址+标签名组成，绝对唯一！
+        minLines: 1,
+        // 关键1：最小1行
+        maxLines: null,
+        // 关键2：最大行数无限制，文本越多框越长
+        keyboardType: TextInputType.multiline,
+        // 关键3：允许多行输入
         initialValue: map[label] ?? '计算中...',
         readOnly: false,
         // 只读
@@ -457,7 +494,6 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         // ⭐ 极其重要：绑定当前值，重建时才不会变成白板
         initialValue: currentVal,
         isExpanded: true,
-
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(
@@ -468,6 +504,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
           ),
           filled: true,
           fillColor: Colors.grey[200],
+          // 禁用时变灰
           isDense: true,
           border: OutlineInputBorder(
             borderSide: BorderSide.none,
@@ -505,6 +542,120 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             );
           }).toList();
         },
+      ),
+    );
+  }
+
+  // ⭐ 修改位置：新增二级联动组件函数
+  Widget _buildLinkedDropdown(
+    String label,
+    Map<String, List<String>> dataMap, {
+    Map<String, dynamic>? targetMap,
+  }) {
+    final map = targetMap ?? _defaultMap;
+    // 存储格式建议为 "大类-具体值"，或者只存具体值
+    String? currentVal = map[label]?.toString();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: InkWell(
+        // 使用 InkWell 模拟下拉框点击外观
+        onTap: () => _showLevelOnePicker(label, dataMap, map),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle: TextStyle(
+              color: Colors.green[800],
+              fontWeight: FontWeight.bold,
+              overflow: TextOverflow.ellipsis,
+            ),
+            filled: true,
+            fillColor: Colors.grey[200],
+            isDense: true,
+            suffixIcon: Icon(Icons.arrow_drop_down),
+            // 模拟下拉箭头
+            border: OutlineInputBorder(
+              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text(
+            currentVal ?? "请选择",
+            style: TextStyle(
+              fontSize: 14,
+              color: currentVal == null ? Colors.grey : Colors.black,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ⭐ 逻辑实现：第一级选择（大类）
+  void _showLevelOnePicker(
+    String label,
+    Map<String, List<String>> dataMap,
+    Map map,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => ListView(
+        shrinkWrap: true,
+        children: dataMap.keys
+            .map(
+              (category) => ListTile(
+                title: Text(category),
+                onTap: () {
+                  Navigator.pop(context);
+                  // 选中大类后，立即进入第二级选择
+                  _showLevelTwoPicker(label, category, dataMap[category]!, map);
+                },
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  // ⭐ 逻辑实现：第二级选择（具体值）
+  void _showLevelTwoPicker(
+    String label,
+    String category,
+    List<String> subItems,
+    Map map,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppBar(
+            title: Text("选择$category的具体类型", style: TextStyle(fontSize: 16)),
+            automaticallyImplyLeading: false,
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+          ),
+          Expanded(
+            child: ListView(
+              shrinkWrap: true,
+              children: subItems
+                  .map(
+                    (item) => ListTile(
+                      title: Text(item),
+                      onTap: () {
+                        setState(() {
+                          // 存储最终结果，例如 "植被: 乔木"
+                          map[label] = "$category: $item";
+                        });
+                        Navigator.pop(context);
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1004,7 +1155,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
           _buildAutoBox('所属流域'),
           Row(
             children: [
-              Expanded(child: _buildAutoBox('土地利用类型')),
+              Expanded(child: _buildLinkedDropdown('土地利用类型', _categoryData)),
               SizedBox(width: 8),
               Expanded(child: _buildAutoBox('生态系统类型')),
             ],
@@ -1314,12 +1465,19 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                     ],
                   ),
                   _buildInput('分层结构'),
-                  _buildInput('土壤质地'),
+                  _buildDropdown('土壤质地', ['粘土', '壤土', '砂壤土', '壤砂土', '砂土']),
                   Row(
                     children: [
                       Expanded(child: _buildInput('紧实度')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildInput('结持性')),
+                      Expanded(
+                        child: _buildDropdown('结持性', [
+                          '疏松',
+                          '坚实',
+                          '很坚实',
+                          '极坚实',
+                        ]),
+                      ),
                       SizedBox(width: 8),
                       Expanded(child: _buildInput('砾石含量(%)')),
                     ],
@@ -1483,7 +1641,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
           _buildPhotoField('柱状剖面图', '照片_柱状剖面图'),
           // _buildAutoBox('剖面特征描述'),
           _buildPhotoField('景观描述照片', '照片_景观描述照片'),
-          // _buildPhotoField('空间位置截图', '照片_空间位置截图'),
+          _buildPhotoField('空间位置截图', '照片_空间位置截图'),
         ],
       ),
 
@@ -1691,12 +1849,19 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                     ],
                   ),
                   _buildInput('分层结构'),
-                  _buildInput('土壤质地'),
+                  _buildDropdown('土壤质地', ['粘土', '壤土', '砂壤土', '壤砂土', '砂土']),
                   Row(
                     children: [
                       Expanded(child: _buildInput('紧实度')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildInput('结持性')),
+                      Expanded(
+                        child: _buildDropdown('结持性', [
+                          '疏松',
+                          '坚实',
+                          '很坚实',
+                          '极坚实',
+                        ]),
+                      ),
                       SizedBox(width: 8),
                       Expanded(child: _buildInput('砾石含量(%)')),
                     ],
