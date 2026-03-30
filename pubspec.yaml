@@ -45,6 +45,8 @@ dependencies:
   coordtransform: ^1.0.2  # WGS-84 与 GCJ-02、BD-09 互转库
   amap_core: ^1.0.4
   dio: ^5.4.0
+  path_provider: ^2.1.1
+  image: ^4.1.3
 
 
 

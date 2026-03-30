@@ -13,6 +13,7 @@ class FieldSurveyFormPage extends StatefulWidget {
   final int taskId; // ⭐ 新增：整型的 taskId
   final String pathId; // ⭐ 修改：原本的 routeId 改叫 pathId 更贴切（类似 xL_001）
   final String templateType; // 新增：接收模板类型
+  final String? autoScreenshotPath; // ⭐ 新增：可选的系统截图路径
 
   const FieldSurveyFormPage({
     Key? key,
@@ -20,6 +21,7 @@ class FieldSurveyFormPage extends StatefulWidget {
     required this.taskId, // 必传
     required this.pathId, // 必传
     required this.templateType,
+    this.autoScreenshotPath, // ⭐ 加入构造器
   }) : super(key: key);
 
   @override
@@ -316,7 +318,14 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
 
       // 照片数据列表初始化
       '照片_柱状剖面图': <Map<String, String>>[],
-      '照片_空间位置截图': <Map<String, String>>[],
+      '照片_空间位置截图': widget.autoScreenshotPath != null
+          ? <Map<String, String>>[
+              {
+                'id': "IMG_${DateTime.now().millisecondsSinceEpoch}",
+                'path': widget.autoScreenshotPath!,
+              },
+            ]
+          : <Map<String, String>>[], // 未传入则留空,
       '照片_样品照片': <Map<String, String>>[],
       '照片_景观描述照片': <Map<String, String>>[],
       '林草样方照片': <Map<String, String>>[],
@@ -344,21 +353,13 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       });
     } else if (widget.templateType == '3') {
       // ---- 林草调查表 专属初始化 ----
-      _formData.addAll({
-        '样地号': '生态区编号-${widget.pathId}-YD',
-      });
-    }
-    else if (widget.templateType == '4') {
+      _formData.addAll({'样地号': '生态区编号-${widget.pathId}-YD'});
+    } else if (widget.templateType == '4') {
       // ---- 林草调查表 专属初始化 ----
-      _formData.addAll({
-        '样方号': '生态区编号-${widget.pathId}-YF',
-      });
-    }
-    else if (widget.templateType == '5') {
+      _formData.addAll({'样方号': '生态区编号-${widget.pathId}-YF'});
+    } else if (widget.templateType == '5') {
       // ---- 林草调查表 专属初始化 ----
-      _formData.addAll({
-        '样方号': '生态区编号-${widget.pathId}-YF',
-      });
+      _formData.addAll({'样方号': '生态区编号-${widget.pathId}-YF'});
     }
   }
 
