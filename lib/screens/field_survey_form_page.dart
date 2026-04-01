@@ -91,11 +91,11 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
   final Map<String, List<String>> _lithology = {
     "沉积岩": [
       "砾岩类",
-      " 砂岩类",
+      "砂岩类",
       "粉砂岩类",
       "页岩类",
       "泥岩（粘土岩）类",
-      " 非蒸发岩类",
+      "非蒸发岩类",
       "蒸发岩类",
       "可燃有机岩",
       "松散堆积物",
@@ -238,6 +238,31 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString('jwt_token');
 
+      // ==========================================
+      // ⭐ 新增代码：获取主编号
+      // 根据模板类型，精确提取对应的编号字段
+      // ==========================================
+      String mainCode = "";
+      if (widget.templateType == '1') {
+        mainCode = _formData['点号'] ?? "";
+      } else if (widget.templateType == '2') {
+        mainCode = _formData['剖面号'] ?? "";
+      } else if (widget.templateType == '3') {
+        mainCode = _formData['样地号'] ?? "";
+      } else if (widget.templateType == '4' || widget.templateType == '5') {
+        mainCode = _formData['样方号'] ?? "";
+      }
+
+      // 降级容错(极为重要)：如果上面由于某种原因没取到(比如没网没拿到或者用户删了)，
+      // 我们用级联运算符 ?? 硬抓一次，确保绝对有值
+      if (mainCode.isEmpty) {
+        mainCode = _formData['剖面号'] ??
+            _formData['点号'] ??
+            _formData['样方号'] ??
+            _formData['样地号'] ??
+            "UNKNOWN_CODE_${DateTime.now().millisecondsSinceEpoch}";
+      }
+
       // 1. 分离文本和照片数据
       Map<String, dynamic> textData = {};
       List<MapEntry<String, MultipartFile>> fileEntries = [];
@@ -324,6 +349,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         "lat": widget.currentGps.latitude,
         "path_id": widget.pathId,
         "type": widget.templateType,
+        "point_serial":mainCode,
         // 所有纯文本统一转化为一个大 JSON 字符串
         "properties": jsonEncode(textData),
       });
@@ -996,14 +1022,17 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                     targetMap: itemMap,
                   ),
                   _buildDropdown('生态问题程度', [
+                    '无',
+                    '未',
+                    '潜在',
                     '微度',
                     '轻度',
                     '中度',
                     '强度',
-                    '极强度',
-                    '剧烈',
                     '重度',
                     '极重度',
+                    '极强度',
+                    '剧烈',
                   ], targetMap: itemMap),
                   _buildDropdown('生态问题影响因素', [
                     '人为',

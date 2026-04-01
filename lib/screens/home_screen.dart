@@ -631,7 +631,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       // 3. 稍微等待几十毫秒，让地图渲染出新瓦片后执行物理截图
-      await Future.delayed(Duration(milliseconds: 300));
+      await Future.delayed(Duration(milliseconds: 900));
       screenshotPath = await _captureMapSquare();
 
       // 4. 关闭加载黑框
