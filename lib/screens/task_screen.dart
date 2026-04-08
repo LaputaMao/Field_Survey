@@ -21,7 +21,7 @@ class _TaskScreenState extends State<TaskScreen> {
     _fetchTasks();
   }
 
-  // 1. 获取任务列表
+  // 1.tip 获取任务列表
   Future<void> _fetchTasks() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('jwt_token');
@@ -51,7 +51,7 @@ class _TaskScreenState extends State<TaskScreen> {
     }
   }
 
-  // 2. 接收特定任务并拉取 GeoJSON 详情
+  // 2.  接收特定任务并拉取 GeoJSON 详情
   Future<void> _fetchTaskGeoJSON(Map<String, dynamic> task) async {
     // 弹出全屏加载圈，防止用户狂点
     showDialog(
@@ -92,7 +92,7 @@ class _TaskScreenState extends State<TaskScreen> {
     }
   }
 
-  // ============== 更新：接收任务并拉取所有详情 ==============
+  // ============== 更新：tip 接收任务并拉取所有详情 ==============
   Future<void> _fetchTaskDetail(Map<String, dynamic> task) async {
     showDialog(
       // 弹出加载圈

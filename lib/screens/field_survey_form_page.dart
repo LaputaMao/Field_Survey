@@ -12,10 +12,13 @@ import 'dart:math' as math;
 
 class FieldSurveyFormPage extends StatefulWidget {
   final LatLng currentGps; // 传入GPS位置
-  final int taskId; // ⭐ 新增：整型的 taskId
-  final String pathId; // ⭐ 修改：原本的 routeId 改叫 pathId 更贴切（类似 xL_001）
-  final String templateType; // 新增：接收模板类型
-  final String? autoScreenshotPath; // ⭐ 新增：可选的系统截图路径
+  final int taskId; // 整型的 taskId
+  final String pathId; // 原本的 routeId 改叫 pathId
+  final String templateType; // 接收模板类型
+  final String? autoScreenshotPath; // 可选的系统截图路径
+  // ⭐ 新增参数：用于编辑模式
+  final String? editPointId; // 如果不为null，说明是编辑老点
+  final Map<String, dynamic>? initialData; // 从后端拉回的老表单数据大JSON
 
   const FieldSurveyFormPage({
     Key? key,
@@ -23,7 +26,9 @@ class FieldSurveyFormPage extends StatefulWidget {
     required this.taskId, // 必传
     required this.pathId, // 必传
     required this.templateType,
-    this.autoScreenshotPath, // ⭐ 加入构造器
+    this.autoScreenshotPath, //加入构造器
+    this.editPointId,
+    this.initialData,
   }) : super(key: key);
 
   @override
@@ -150,6 +155,31 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
   // 注意：修改为你真实的后端 IP 或域名
   final String _baseUrl = ApiConfig.baseUrl;
 
+  // ======== 修复起点 1：新增万能照片提取小工具 ========
+  List<Map<String, String>> _safeParsePhotos(dynamic rawList) {
+    if (rawList == null || rawList is! List) return <Map<String, String>>[];
+    List<Map<String, String>> result = [];
+
+    for (var item in rawList) {
+      if (item is Map) {
+        result.add({
+          'id':
+              item['id']?.toString() ??
+              'IMG_${DateTime.now().microsecondsSinceEpoch}',
+          'path': item['path']?.toString() ?? '',
+        });
+      } else if (item is String) {
+        // ⭐ 关键修复：兼容后端发来的 ["/uploads/xxxx.jpg"] 纯字符串数组
+        result.add({
+          // 使用微秒防止生成ID重复
+          'id': 'IMG_${DateTime.now().microsecondsSinceEpoch}',
+          'path': item,
+        });
+      }
+    }
+    return result;
+  }
+
   // ============== 新增：自动填表懒加载逻辑 ==============
   Future<void> _fetchAutoFillData() async {
     // tip 1. 甲方可能会增减的自动计算字段，统一在这里维护：
@@ -224,7 +254,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
     return value?.toString() ?? "";
   }
 
-  //tip ============== HTTP：混合打点上传逻辑 ==============
+  //tip ============== HTTP：打点上传逻辑 || 修改点 ==============
   Future<void> _submitForm() async {
     // 弹出加载圈
     showDialog(
@@ -256,7 +286,8 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       // 降级容错(极为重要)：如果上面由于某种原因没取到(比如没网没拿到或者用户删了)，
       // 我们用级联运算符 ?? 硬抓一次，确保绝对有值
       if (mainCode.isEmpty) {
-        mainCode = _formData['剖面号'] ??
+        mainCode =
+            _formData['剖面号'] ??
             _formData['点号'] ??
             _formData['样方号'] ??
             _formData['样地号'] ??
@@ -270,68 +301,152 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       for (var key in _formData.keys) {
         var value = _formData[key];
 
+        // if (value is List) {
+        //   // A. 处理公共层级的普通照片栏
+        //   if (key.startsWith('照片_') ||
+        //       key.contains('相片') ||
+        //       key.contains('照片')) {
+        //     for (var photo in value) {
+        //       if (photo is Map && photo.containsKey('path')) {
+        //         fileEntries.add(
+        //           MapEntry(
+        //             key, // 外层键名直接传
+        //             await MultipartFile.fromFile(
+        //               photo['path']!,
+        //               filename: "${photo['id']}.jpg",
+        //             ),
+        //           ),
+        //         );
+        //       }
+        //     }
+        //   }
+        //   // B. 处理结构体内部的数据 (重点修复区域)
+        //   else if (key.startsWith('dynamic_assets_')) {
+        //     List<Map<String, dynamic>> cleanStructList = [];
+        //
+        //     for (int i = 0; i < value.length; i++) {
+        //       var struct = value[i];
+        //       Map<String, dynamic> cleanStruct = {};
+        //
+        //       if (struct is Map) {
+        //         // ⭐ 修复关键：使用 for...in...entries 代替 forEach，确保 await 真正阻塞等待！
+        //         for (var entry in struct.entries) {
+        //           var sKey = entry.key;
+        //           var sValue = entry.value;
+        //
+        //           // 识别结构体里带有“照片”字样的 List 层
+        //           if (sValue is List &&
+        //               (sKey.startsWith('照片_') || sKey.contains('照片'))) {
+        //             // 这是子结构体里的照片，我们需要给它取一个混合键名防止前后端混淆
+        //             // 格式：父级名_索引_子集名，例如："dynamic_assets_sample_0_0_照片_记录"
+        //             String complexKey = "${key}_${i}_$sKey";
+        //
+        //             for (var photo in sValue) {
+        //               if (photo is Map && photo.containsKey('path')) {
+        //                 fileEntries.add(
+        //                   MapEntry(
+        //                     complexKey,
+        //                     await MultipartFile.fromFile(
+        //                       photo['path']!,
+        //                       filename: "${photo['id']}.jpg",
+        //                     ),
+        //                   ),
+        //                 );
+        //               }
+        //             }
+        //           } else {
+        //             // 普通文本塞回结构体
+        //             cleanStruct[sKey] = sValue;
+        //           }
+        //         }
+        //         cleanStructList.add(cleanStruct);
+        //       }
+        //     }
+        //     textData[key] = cleanStructList; // 剔除了照片后干净的 JSON 阵列
+        //   }
+        // }
+        // 识别到第一层是列表：分为纯照片库，和动态结构体库
         if (value is List) {
-          // A. 处理公共层级的普通照片栏
           if (key.startsWith('照片_') ||
               key.contains('相片') ||
               key.contains('照片')) {
+            // A. 处理公共层级的普通照片栏
+            List<Map<String, String>> retainedOldPhotos = []; // ⭐ 存放未删除的老照片
+
             for (var photo in value) {
               if (photo is Map && photo.containsKey('path')) {
-                fileEntries.add(
-                  MapEntry(
-                    key, // 外层键名直接传
-                    await MultipartFile.fromFile(
-                      photo['path']!,
-                      filename: "${photo['id']}.jpg",
+                String p = photo['path']!;
+                if (p.startsWith('/uploads') || p.startsWith('http')) {
+                  // ⭐ 老照片：不读文件，直接把 JSON 记录留给后端
+                  retainedOldPhotos.add(Map<String, String>.from(photo));
+                } else {
+                  // ⭐ 新拍摄的照片：加入 File 队列，等待 Multipart 上传
+                  fileEntries.add(
+                    MapEntry(
+                      key,
+                      await MultipartFile.fromFile(
+                        p,
+                        filename: "${photo['id']}.jpg",
+                      ),
                     ),
-                  ),
-                );
+                  );
+                }
               }
             }
-          }
-          // B. 处理结构体内部的数据 (重点修复区域)
-          else if (key.startsWith('dynamic_assets_')) {
+            // 把老照片的相对路径信息赛回 JSON，让后端知道哪些老图被保留了
+            // 如果后端不需要的话把这行删掉并跟后端定好协议即可
+            if (retainedOldPhotos.isNotEmpty) textData[key] = retainedOldPhotos;
+          } else if (key.startsWith('dynamic_assets_')) {
+            // B. 处理结构体内部的数据
             List<Map<String, dynamic>> cleanStructList = [];
 
             for (int i = 0; i < value.length; i++) {
               var struct = value[i];
               Map<String, dynamic> cleanStruct = {};
 
-              if (struct is Map) {
-                // ⭐ 修复关键：使用 for...in...entries 代替 forEach，确保 await 真正阻塞等待！
+              if (struct is Map<String, dynamic>) {
+                // ⭐ 极其重大的修复：抛开 forEach，改回 for-in 循环！
+                // 这样这里的 await 才能真正的挂起阻塞等待文件流组装！
                 for (var entry in struct.entries) {
-                  var sKey = entry.key;
+                  String sKey = entry.key;
                   var sValue = entry.value;
 
-                  // 识别结构体里带有“照片”字样的 List 层
                   if (sValue is List &&
-                      (sKey.startsWith('照片_') || sKey.contains('照片'))) {
-                    // 这是子结构体里的照片，我们需要给它取一个混合键名防止前后端混淆
-                    // 格式：父级名_索引_子集名，例如："dynamic_assets_sample_0_0_照片_记录"
+                      (sKey.startsWith('照片_') || sKey.contains('相片'))) {
+                    List<Map<String, String>> structOldPhotos =
+                        []; // ⭐ 存放结构体里的老图
                     String complexKey = "${key}_${i}_$sKey";
 
                     for (var photo in sValue) {
-                      if (photo is Map && photo.containsKey('path')) {
+                      String p = photo['path']!;
+                      if (p.startsWith('/uploads') || p.startsWith('http')) {
+                        structOldPhotos.add(
+                          Map<String, String>.from(photo),
+                        ); // 保留老图
+                      } else {
+                        // 发射新图进队列 (这里的 await 现在完美生效了)
                         fileEntries.add(
                           MapEntry(
                             complexKey,
                             await MultipartFile.fromFile(
-                              photo['path']!,
+                              p,
                               filename: "${photo['id']}.jpg",
                             ),
                           ),
                         );
                       }
                     }
+                    if (structOldPhotos.isNotEmpty) {
+                      cleanStruct[sKey] = structOldPhotos;
+                    }
                   } else {
-                    // 普通文本塞回结构体
-                    cleanStruct[sKey] = sValue;
+                    cleanStruct[sKey] = sValue; // 普通文本塞回结构体
                   }
                 }
                 cleanStructList.add(cleanStruct);
               }
             }
-            textData[key] = cleanStructList; // 剔除了照片后干净的 JSON 阵列
+            textData[key] = cleanStructList;
           }
         } else {
           // 常规外层纯文本录入
@@ -341,6 +456,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
 
       // 2. 将数据组装为后端需要的 FormData 形态
       var dio = Dio();
+      Response response;
       FormData formData = FormData.fromMap({
         // 后端要求的三个基础参数
         "task_id": widget.taskId, // ⭐ 传入真实的 taskId
@@ -349,20 +465,42 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         "lat": widget.currentGps.latitude,
         "path_id": widget.pathId,
         "type": widget.templateType,
-        "point_serial":mainCode,
+        "point_serial": mainCode,
         // 所有纯文本统一转化为一个大 JSON 字符串
+        "properties": jsonEncode(textData),
+      });
+      FormData formData_update = FormData.fromMap({
         "properties": jsonEncode(textData),
       });
 
       // 补充剥离出来的照片池
       formData.files.addAll(fileEntries);
+      formData_update.files.addAll(fileEntries); // <—— 就是忘了这一行！加上！
 
-      // 3. 一次性发射给后端
-      var response = await dio.post(
-        "$_baseUrl/user/points/upload",
-        data: formData,
-        options: Options(headers: {"Authorization": "Bearer $token"}),
-      );
+      // 区分是更新实体点还是新建实体点
+      if (widget.editPointId != null) {
+        // A. 编辑更新模式
+        response = await dio.post(
+          // 或者 dio.put
+          "$_baseUrl/user/points/${widget.editPointId}/update",
+          data: formData_update,
+          options: Options(headers: {"Authorization": "Bearer $token"}),
+        );
+      } else {
+        // B. 原来的新建上传模式
+        response = await dio.post(
+          "$_baseUrl/user/points/upload",
+          data: formData,
+          options: Options(headers: {"Authorization": "Bearer $token"}),
+        );
+      }
+
+      // // 3. 一次性发射给后端
+      // response = await dio.post(
+      //   "$_baseUrl/user/points/upload",
+      //   data: formData,
+      //   options: Options(headers: {"Authorization": "Bearer $token"}),
+      // );
 
       Navigator.pop(context); // 关闭加载圈
 
@@ -371,7 +509,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('调查点位提交成功！'), backgroundColor: Colors.green),
         );
-        Navigator.pop(context, _formData);
+        Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('提交失败，服务端返回：${response.statusCode}')),
@@ -456,11 +594,139 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
   @override
   void initState() {
     super.initState();
-    // 触发独立自增编号拉取
-    _fetchNextCode();
-    _initAutoFields();
-    //开启异步懒加载后台经纬度相交计算数据
-    _fetchAutoFillData();
+    // // 触发独立自增编号拉取
+    // _fetchNextCode();
+    // _initAutoFields();
+    // //开启异步懒加载后台经纬度相交计算数据
+    // _fetchAutoFillData();
+    // ⭐ 新增逻辑：如果是编辑模式，将后端的大 JSON 覆盖合并进本页的 _formData
+    if (widget.initialData != null) {
+      // _formData.addAll(widget.initialData!);
+      _parseAndMergeInitialData(widget.initialData!);
+    } else {
+      // 如果是新建模式才需要去拉取 next_code 和 auto_fill
+      // (编辑模式下老数据已经有了，不需要重新去后端算默认值)
+      _initAutoFields();
+      _fetchAutoFillData();
+      _fetchNextCode();
+    }
+  }
+
+  // ======== 修改起点 1：新增安全解析旧数据方法 ========
+  // void _parseAndMergeInitialData(Map<String, dynamic> initialData) {
+  //   initialData.forEach((key, value) {
+  //     // 1. 如果后端传了 null（或者某字段遗漏），直接跳过！
+  //     // 这样就能保留我们 _initAutoFields 里初始化的默认空数组，绝不会崩溃。
+  //     if (value == null) return;
+  //
+  //     // 2. 处理动态结构体数组 (例如 dynamic_assets_ecoProblem, sample_0 等)
+  //     if (key.startsWith('dynamic_assets_') && value is List) {
+  //       List<Map<String, dynamic>> typedStructList = [];
+  //       for (var item in value) {
+  //         if (item is Map) {
+  //           Map<String, dynamic> structMap = Map<String, dynamic>.from(item);
+  //
+  //           // ⚠️ 极度细节：结构体内部如果还有照片列表，也要将其强转为 String 泛型！
+  //           structMap.forEach((sKey, sValue) {
+  //             if ((sKey.startsWith('照片_') || sKey.contains('相片')) &&
+  //                 sValue is List) {
+  //               // List<Map<String, String>> photoList = [];
+  //               // for (var p in sValue) {
+  //               //   if (p is Map) photoList.add(Map<String, String>.from(p));
+  //               // }
+  //               // structMap[sKey] = photoList;
+  //               structMap[sKey] = _safeParsePhotos(sValue);
+  //             }
+  //           });
+  //
+  //           typedStructList.add(structMap);
+  //         }
+  //       }
+  //       _formData[key] = typedStructList;
+  //     }
+  //     // 3. 处理公共区的纯照片数组
+  //     else if ((key.startsWith('照片_') || key.contains('相片')) && value is List) {
+  //       // List<Map<String, String>> photoList = [];
+  //       // for (var p in value) {
+  //       //   if (p is Map) photoList.add(Map<String, String>.from(p));
+  //       // }
+  //       // _formData[key] = photoList;
+  //       _formData[key] = _safeParsePhotos(value);
+  //     }
+  //     // 4. 其他文本、数值等常规简单字段，安全直接赋值
+  //     else {
+  //       _formData[key] = value;
+  //     }
+  //   });
+  // }
+
+  // ======== 修改终点 1 ========
+
+  // ======== 修复起止点 1：安全合并回显数据 ========
+  void _parseAndMergeInitialData(Map<String, dynamic> initialData) {
+    // 1. 初步遍历赋值
+    initialData.forEach((key, value) {
+      if (value == null) return;
+
+      // ⭐ 核心修复：精准隔离！
+      // 必须保证名字里千万不能带有 "_照片_" 或者 "_相片_" 才代表它是【结构体本身】
+      if (key.startsWith('dynamic_assets_') &&
+          !key.contains('_照片_') &&
+          !key.contains('_相片_') &&
+          value is List) {
+        List<Map<String, dynamic>> typedStructList = [];
+        for (var item in value) {
+          if (item is Map) {
+            Map<String, dynamic> structMap = Map<String, dynamic>.from(item);
+            // 这里是为了防备：如果有一天后端嵌套回传了，也能接住
+            structMap.forEach((sKey, sValue) {
+              if ((sKey.startsWith('照片_') || sKey.contains('相片')) &&
+                  sValue is List) {
+                structMap[sKey] = _safeParsePhotos(sValue);
+              }
+            });
+            typedStructList.add(structMap);
+          }
+        }
+        _formData[key] = typedStructList;
+      }
+      // 公共区的纯照片数组
+      else if ((key.startsWith('照片_') || key.contains('相片')) && value is List) {
+        _formData[key] = _safeParsePhotos(value);
+      } else {
+        // ⭐ 其他常规文本，以及形如 "dynamic_assets_sample..._照片" 的扁平外露图串
+        // 不做解析原封不动塞进去，留给第二步！
+        _formData[key] = value;
+      }
+    });
+
+    // 2. ⭐ 将第一步保留下的扁平化样品图串数据塞回对应的深层节点内
+    List<String> keysToRemove = [];
+    _formData.forEach((key, value) {
+      RegExp regex = RegExp(r"^(dynamic_assets_.+)_(\d+)_((?:照片|相片).*)$");
+      var match = regex.firstMatch(key);
+
+      if (match != null && value is List) {
+        String structKey = match.group(1)!; // e.g. dynamic_assets_sample_0
+        int index = int.parse(match.group(2)!); // 0
+        String subKey = match.group(3)!; // 照片_记录
+
+        if (_formData[structKey] is List &&
+            (_formData[structKey] as List).length > index) {
+          var structItem = _formData[structKey][index];
+          if (structItem is Map) {
+            // ⭐ 此时 value 是安然无恙的 ["/uploads/xxxx.jpg"] 列表，完美解析！
+            structItem[subKey] = _safeParsePhotos(value);
+          }
+        }
+        keysToRemove.add(key);
+      }
+    });
+
+    // 清理废弃的平铺外层Key
+    for (var k in keysToRemove) {
+      _formData.remove(k);
+    }
   }
 
   // ============== 核心逻辑：集中初始化所有“自动”字段 ==============
@@ -858,23 +1124,82 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             scrollDirection: Axis.horizontal,
             children: [
               // 拍照按钮
+              // ================= 修改起点：拍照/相册选项按钮 =================
               GestureDetector(
-                onTap: () async {
-                  final picker = ImagePicker();
-                  final XFile? img = await picker.pickImage(
-                    source: ImageSource.camera,
-                  );
-                  if (img != null) {
-                    // 生成基于当前时间的时间戳ID，如20260320_194859
-                    DateTime now = DateTime.now();
-                    String timeStampStr =
-                        "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}";
-                    String photoId = "IMG_$timeStampStr";
+                onTap: () {
+                  // 点击弹出底部选择抽屉
+                  showModalBottomSheet(
+                    context: context,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                    ),
+                    builder: (BuildContext bc) {
+                      return SafeArea(
+                        child: Wrap(
+                          children: [
+                            ListTile(
+                              leading: Icon(
+                                Icons.camera_alt,
+                                color: Colors.green,
+                              ),
+                              title: Text('拍照'),
+                              onTap: () async {
+                                Navigator.of(context).pop(); // 先关闭抽屉
+                                final picker = ImagePicker();
+                                final XFile? img = await picker.pickImage(
+                                  source: ImageSource.camera,
+                                );
+                                if (img != null) {
+                                  // ⭐ 引入微秒 microseconds 防同秒冲突
+                                  DateTime now = DateTime.now();
+                                  String timeStr =
+                                      "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}_${now.microsecond}";
 
-                    setState(() {
-                      photos.add({'id': photoId, 'path': img.path});
-                    });
-                  }
+                                  setState(() {
+                                    photos.add({
+                                      'id': "IMG_$timeStr",
+                                      'path': img.path,
+                                    });
+                                  });
+                                }
+                              },
+                            ),
+                            ListTile(
+                              leading: Icon(
+                                Icons.photo_library,
+                                color: Colors.blueAccent,
+                              ),
+                              title: Text('从相册选择 (支持多选)'),
+                              onTap: () async {
+                                Navigator.of(context).pop(); // 先关闭抽屉
+                                final picker = ImagePicker();
+                                // ⭐ 使用 pickMultiImage 支持用户在相册里一次选多张图！
+                                final List<XFile>? images = await picker
+                                    .pickMultiImage();
+                                if (images != null && images.isNotEmpty) {
+                                  setState(() {
+                                    for (var img in images) {
+                                      // 每张图单独抓取瞬间时间(微秒)作为唯一ID
+                                      DateTime now = DateTime.now();
+                                      String timeStr =
+                                          "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}_${now.microsecond}";
+
+                                      photos.add({
+                                        'id': "IMG_$timeStr",
+                                        'path': img.path,
+                                      });
+                                    }
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  );
                 },
                 child: DottedBorder(
                   color: Colors.grey,
@@ -883,14 +1208,36 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                   child: Container(
                     width: 80,
                     height: 80,
-                    child: Icon(Icons.camera_alt, color: Colors.grey),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_a_photo, color: Colors.grey, size: 28),
+                        SizedBox(height: 4),
+                        Text(
+                          "添加",
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+
+              // ================= 修改终点 =================
               SizedBox(width: 10),
               // 照片陈列
               ...photos.asMap().entries.map((e) {
                 final photoData = e.value;
+                String rawPath = photoData['path']!;
+                // ⭐ 核心逻辑 1：判断是否是网络图片(以 /uploads 或 http 开头)
+                bool isNetwork =
+                    rawPath.startsWith('/uploads') ||
+                    rawPath.startsWith('http');
+
+                // ⭐ 核心逻辑 2：动态拼接用于展示的绝对 URL
+                String displayUrl = rawPath.startsWith('/uploads')
+                    ? "${ApiConfig.photoUrl}$rawPath" // 拼接你的全局域名
+                    : rawPath;
                 return Stack(
                   children: [
                     // 点击缩略图放大查看
@@ -909,7 +1256,11 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                               body: Center(
                                 child: InteractiveViewer(
                                   // 支持双指缩放、拖拽
-                                  child: Image.file(File(photoData['path']!)),
+                                  // child: Image.file(File(photoData['path']!)),
+                                  // ⭐ 放大查看器也要兼容网络图片和本地图片
+                                  child: isNetwork
+                                      ? Image.network(displayUrl) // 网络图
+                                      : Image.file(File(rawPath)), // 本地新拍图
                                 ),
                               ),
                             ),
@@ -923,7 +1274,9 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                         decoration: BoxDecoration(
                           border: Border.all(color: Colors.white),
                           image: DecorationImage(
-                            image: FileImage(File(photoData['path']!)),
+                            image: isNetwork
+                                ? NetworkImage(displayUrl) as ImageProvider
+                                : FileImage(File(rawPath)),
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -977,6 +1330,10 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
 
   // 5. 态追加自定义结构体组
   Widget _buildDynamicCustomGroup_ecoProblem() {
+    // ⭐ 新增保护性回退：如果在极其极端的情况下这玩意儿变成 null 了，兜底塞个空数组给它
+    if (_formData['dynamic_assets_ecoProblem'] == null) {
+      _formData['dynamic_assets_ecoProblem'] = <Map<String, dynamic>>[];
+    }
     List<Map<String, dynamic>> dynamicAssets =
         _formData['dynamic_assets_ecoProblem'];
 
