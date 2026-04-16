@@ -1393,7 +1393,7 @@ class _HomeScreenState extends State<HomeScreen> {
               currentGps: point.location,
               pathId: _selectedLine?.properties['线路号']?.toString() ?? "未知",
               taskId: _currentTaskId!,
-              templateType: pointDetail['point_type'] ?? '1',
+              templateType: pointDetail['表格模板编号'] ?? '1',
               // 传入该点对应的模板号
               // 👇下面两个是紧接着我们需要在表单页新增的构造参数
               editPointId: pointId,

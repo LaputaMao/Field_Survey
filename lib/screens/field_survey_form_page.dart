@@ -844,7 +844,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
           : <Map<String, String>>[], // 未传入则留空,
       '照片_样品照片': <Map<String, String>>[],
       '照片_景观描述照片': <Map<String, String>>[],
-      '林草样方照片': <Map<String, String>>[],
+      '照片_林草样方照片': <Map<String, String>>[],
       'dynamic_assets_ecoProblem': <Map<String, dynamic>>[],
       'dynamic_assets_sample_0': <Map<String, dynamic>>[], // A.植被的样品
       'dynamic_assets_sample_1': <Map<String, dynamic>>[], // B.土壤的样品
@@ -1738,10 +1738,9 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
               Expanded(child: _buildInput('地表蒸散量')),
               SizedBox(width: 8),
               Expanded(child: _buildInput('地下水埋深')),
-              SizedBox(width: 8),
-              Expanded(child: _buildAutoBox('多年平均降水量')),
             ],
           ),
+          _buildAutoBox('多年平均降水量'),
           _buildDynamicCustomGroup_ecoProblem(),
         ],
       ),
@@ -1785,10 +1784,9 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                       Expanded(flex: 3, child: _buildAutoBox('植被类型')),
                       SizedBox(width: 8),
                       Expanded(flex: 3, child: _buildInput('植被覆盖度(%)')),
-                      SizedBox(width: 8),
-                      Expanded(flex: 2, child: _buildInput('高度(m)')),
                     ],
                   ),
+                  _buildInput('植被高度(m)'),
                   _buildDropdown('起源', ['自然植被', '人工植被']),
                   Row(
                     children: [
@@ -1822,7 +1820,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                       SizedBox(width: 8),
                       Expanded(child: _buildInput('厚度(cm)')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildInput('土被覆盖率')),
+                      Expanded(child: _buildInput('土被覆盖率(%)')),
                     ],
                   ),
                   _buildInput('分层结构'),
@@ -1887,9 +1885,9 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                   ]),
                   Row(
                     children: [
-                      Expanded(child: _buildInput('颜色')),
+                      Expanded(child: _buildInput('成土母质颜色')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildInput('厚度(m)')),
+                      Expanded(child: _buildInput('成土母质厚度(m)')),
                     ],
                   ),
                   Row(
@@ -1929,7 +1927,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                     children: [
                       Expanded(child: _buildInput('风化壳类型')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildInput('风化壳厚度')),
+                      Expanded(child: _buildInput('风化壳厚度(m)')),
                     ],
                   ),
                   Row(
@@ -2106,10 +2104,9 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
               Expanded(child: _buildInput('地表蒸散量')),
               SizedBox(width: 8),
               Expanded(child: _buildInput('地下水埋深')),
-              SizedBox(width: 8),
-              Expanded(child: _buildAutoBox('多年平均降水量')),
             ],
           ),
+          _buildAutoBox('多年平均降水量'),
           _buildDynamicCustomGroup_ecoProblem(),
         ],
       ),
@@ -2155,10 +2152,9 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                       Expanded(flex: 3, child: _buildAutoBox('植被类型')),
                       SizedBox(width: 8),
                       Expanded(flex: 3, child: _buildInput('植被覆盖度(%)')),
-                      SizedBox(width: 8),
-                      Expanded(flex: 2, child: _buildInput('高度(m)')),
                     ],
                   ),
+                  _buildInput('植被高度(m)'),
                   _buildDropdown('起源', ['自然植被', '人工植被']),
                   Row(
                     children: [
@@ -2192,7 +2188,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                       SizedBox(width: 8),
                       Expanded(child: _buildInput('厚度(cm)')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildInput('土被覆盖率')),
+                      Expanded(child: _buildInput('土被覆盖率(%)')),
                     ],
                   ),
                   _buildInput('分层结构'),
@@ -2257,9 +2253,9 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                   ]),
                   Row(
                     children: [
-                      Expanded(child: _buildInput('颜色')),
+                      Expanded(child: _buildInput('成土母质颜色')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildInput('厚度(m)')),
+                      Expanded(child: _buildInput('成土母质厚度(m)')),
                     ],
                   ),
                   Row(
@@ -2299,7 +2295,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                     children: [
                       Expanded(child: _buildInput('风化壳类型')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildInput('风化壳厚度')),
+                      Expanded(child: _buildInput('风化壳厚度(m)')),
                     ],
                   ),
                   Row(
@@ -2376,7 +2372,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         initiallyExpanded: true,
         maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
         title: Text('样方取样模块', style: TextStyle(fontWeight: FontWeight.bold)),
-        children: [_buildPhotoField('林草样方照片', '林草样方照片')],
+        children: [_buildPhotoField('林草样方照片', '照片_林草样方照片')],
       ),
       ExpansionTile(
         initiallyExpanded: true,
@@ -2388,7 +2384,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             children: [
               Expanded(flex: 2, child: _buildAutoBox('样地号')),
               SizedBox(width: 8),
-              Expanded(child: _buildDropdown('样地面积', ['20*20(m)', '30*30(m)'])),
+              Expanded(child: _buildDropdown('样地面积(㎡)', ['20*20', '30*30'])),
             ],
           ),
           Row(
@@ -2415,15 +2411,15 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
           ),
           Row(
             children: [
-              Expanded(child: _buildInput('植被总盖度%')),
+              Expanded(child: _buildInput('植被总盖度(%)')),
               SizedBox(width: 8),
-              Expanded(child: _buildInput('林分郁闭度%')),
+              Expanded(child: _buildInput('林分郁闭度(%)')),
             ],
           ),
-          _buildInput('优势树种'),
+          _buildInput('优势种'),
           Row(
             children: [
-              Expanded(child: _buildInput('平均年龄')),
+              Expanded(child: _buildInput('平均年龄(n)')),
               SizedBox(width: 8),
               Expanded(child: _buildInput('平均树高(m)')),
               SizedBox(width: 8),
@@ -2454,7 +2450,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         initiallyExpanded: true,
         maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
         title: Text('样方取样模块', style: TextStyle(fontWeight: FontWeight.bold)),
-        children: [_buildPhotoField('林草样方照片', '林草样方照片')],
+        children: [_buildPhotoField('林草样方照片', '照片_林草样方照片')],
       ),
       ExpansionTile(
         initiallyExpanded: true,
@@ -2466,14 +2462,14 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             children: [
               Expanded(flex: 2, child: _buildAutoBox('样方号')),
               SizedBox(width: 8),
-              Expanded(child: _buildAutoBox('灌木样方面积')),
+              Expanded(child: _buildAutoBox('灌木样方面积(㎡)')),
             ],
           ),
           Row(
             children: [
               Expanded(child: _buildInput('优势种')),
               SizedBox(width: 8),
-              Expanded(child: _buildInput('覆盖度%')),
+              Expanded(child: _buildInput('覆盖度(%)')),
               SizedBox(width: 8),
               Expanded(child: _buildInput('平均高(m)')),
             ],
@@ -2503,7 +2499,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         initiallyExpanded: true,
         maintainState: true, // ⭐ 新增：保持状态，收起不销毁内存
         title: Text('样方取样模块', style: TextStyle(fontWeight: FontWeight.bold)),
-        children: [_buildPhotoField('林草样方照片', '林草样方照片')],
+        children: [_buildPhotoField('林草样方照片', '照片_林草样方照片')],
       ),
       ExpansionTile(
         initiallyExpanded: true,
@@ -2515,14 +2511,14 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             children: [
               Expanded(flex: 2, child: _buildAutoBox('样方号')),
               SizedBox(width: 8),
-              Expanded(child: _buildAutoBox('草木样方面积')),
+              Expanded(child: _buildAutoBox('草木样方面积(㎡)')),
             ],
           ),
           Row(
             children: [
               Expanded(child: _buildInput('优势种')),
               SizedBox(width: 8),
-              Expanded(child: _buildInput('覆盖度%')),
+              Expanded(child: _buildInput('覆盖度(%)')),
               SizedBox(width: 8),
               Expanded(child: _buildInput('平均高(m)')),
             ],
