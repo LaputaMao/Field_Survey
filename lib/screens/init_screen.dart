@@ -109,7 +109,13 @@ class _InitScreenState extends State<InitScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.eco, size: 80, color: Colors.green),
+            // Icon(Icons.eco, size: 80, color: Colors.green),
+            Image.asset(
+              'assets/logo.png',
+              width: 80,  // 对应原来图标的 size 宽度
+              height: 80, // 对应原来图标的 size 高度
+              fit: BoxFit.contain, // 保证你的 Logo 比例不会变形
+            ),
             SizedBox(height: 24),
             CircularProgressIndicator(color: Colors.green),
             SizedBox(height: 16),

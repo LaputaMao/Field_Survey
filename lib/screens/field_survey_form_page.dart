@@ -184,18 +184,39 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
   Future<void> _fetchAutoFillData() async {
     // tip 1. 甲方可能会增减的自动计算字段，统一在这里维护：
     List<String> autoFieldsReq = [
+      "地理位置",
+      "地面高程",
+      "多年平均降水量",
+      "图幅",
       "所属三级生态基础分区",
-      "土纲土亚纲土类",
-      // "图幅名",
-      // "图幅号",
-      // "所属生态区",
-      // "年降雨量", // 在这里任意添加后台支持的字段
+      "坡度",
+      "坡向",
+      "土壤类型",
+      "地貌类型",
+      "生态区编号",
+      "所属流域",
+      // 在这里任意添加后台支持的字段
+    ];
+
+    // ⭐ 修改点2：更新UI占位符列表(因为图幅会展平为图幅号和图幅名，不需要占位"图幅")
+    List<String> uiPlaceholders = [
+      "地理位置",
+      "地面高程",
+      "多年平均降水量",
+      "图幅名",
+      "图幅号",
+      "所属三级生态基础分区",
+      "坡度",
+      "坡向",
+      "土壤类型",
+      "地貌类型",
+      "所属流域",
     ];
 
     // 先把要拉取的字段全部初始化为 "计算中..."
     setState(() {
       for (var field in autoFieldsReq) {
-        _formData[field] = "计算中...";
+        _formData[field] = "";
       }
     });
 
@@ -222,13 +243,21 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
 
         setState(() {
           resData.forEach((key, value) {
-            // 2. tip 如果后台返回的是嵌套字典，比如 "土纲土亚纲土类": {"土亚纲": "...", "土类":"..."}
-            if (value is Map) {
+            // ⭐ 修改点3：针对地理位置做省市县拼接特判
+            if (key == "地理位置" && value is Map) {
+              String province = value['省'] ?? "";
+              String city = value['市'] ?? "";
+              String county = value['县'] ?? "";
+              _formData['地理位置'] = "$province$city$county";
+            }
+            // 普通的嵌套字典处理 (例如 "图幅" 展平赋值为 图幅号、图幅名)
+            else if (value is Map) {
               value.forEach((subKey, subValue) {
                 _formData[subKey] = _formatNumber(subValue);
               });
-            } else {
-              // 3. 常平级字段直接赋值
+            }
+            // 其他常规属性直接赋值 (如 地面高程, 生态区编号等)
+            else {
               _formData[key] = _formatNumber(value);
             }
           });
@@ -572,15 +601,17 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
           // ==========================================
           _formData['调查人'] = username;
           _formData['记录人'] = username;
+          // ⭐ 修改点：动态提取自动填表中拉回来的生态区编号，若缺失则提供默认占位防报错
+          String ecoCode = _formData['生态区编号']?.toString() ?? "未知生态区";
 
           if (widget.templateType == '1') {
-            _formData['点号'] = "生态区编号-${widget.pathId}-D$nextCode";
+            _formData['点号'] = "$ecoCode-${widget.pathId}-D$nextCode";
           } else if (widget.templateType == '2') {
-            _formData['剖面号'] = "生态区编号-${widget.pathId}-P$nextCode";
+            _formData['剖面号'] = "$ecoCode-${widget.pathId}-P$nextCode";
           } else if (widget.templateType == '3') {
-            _formData['样地号'] = "生态区编号-${widget.pathId}-YD$nextCode";
+            _formData['样地号'] = "$ecoCode-${widget.pathId}-YD$nextCode";
           } else {
-            _formData['样方号'] = "生态区编号-${widget.pathId}-YF$nextCode";
+            _formData['样方号'] = "$ecoCode-${widget.pathId}-YF$nextCode";
           }
           // ==========================================
         });
@@ -589,6 +620,14 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       debugPrint("获取编号失败: $e");
       // 失败的话给个默认提示，允许手改
     }
+  }
+
+  // ⭐ 新增：处理新建打点的网络请求链
+  Future<void> _loadNewPointDataSequence() async {
+    // 1. 先等待自动填充接口返回（拿到生态区编号与各文本填充）
+    await _fetchAutoFillData();
+    // 2. 再根据拿到的生态区编号去拼接取号器的数据
+    await _fetchNextCode();
   }
 
   @override
@@ -606,9 +645,12 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
     } else {
       // 如果是新建模式才需要去拉取 next_code 和 auto_fill
       // (编辑模式下老数据已经有了，不需要重新去后端算默认值)
+      // _initAutoFields();
+      // _fetchAutoFillData();
+      // _fetchNextCode();
       _initAutoFields();
-      _fetchAutoFillData();
-      _fetchNextCode();
+      // ⭐ 修改点：使用异步任务流控制请求顺序，保障能够取到生态区编号
+      _loadNewPointDataSequence();
     }
   }
 
@@ -849,7 +891,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
         // 关键2：最大行数无限制，文本越多框越长
         keyboardType: TextInputType.multiline,
         // 关键3：允许多行输入
-        initialValue: map[label] ?? '计算中...',
+        initialValue: map[label] ?? '',
         readOnly: false,
         // 只读
         style: TextStyle(color: Colors.grey[1000], fontSize: 14),

@@ -3,7 +3,7 @@ class ApiConfig {
   // 模拟器调试用 10.0.2.2，真机调试用 cpolar 生成的公网地址
   // tip static const String baseUrl = 'http://10.0.2.2:9096/api/v1';
   static const String baseUrl = '$photoUrl/api/v1';
-  static const String photoUrl = 'http://31bed1f3.r8.vip.cpolar.cn';
+  static const String photoUrl = 'http://192.168.39.186:9096';
 
   // 拼接所有的 Endpoints
   static const String loginUrl = '$baseUrl/login';
