@@ -61,6 +61,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_native_splash: ^2.4.7
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -72,13 +73,20 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  assets:
+    - assets/
+    # (或者你也可以直接写 - assets/ 这样就把整个文件夹都包含进去了)
 
 flutter_native_splash:
   color: "#ffffff" # 背景颜色
-  image: assets/logo.png # 替换为你自己的App logo路径
+#  image: assets/logo.png # 替换为你自己的App logo路径
+  branding: "assets/logoo.png" # 这张图会被自动贴在屏幕最底部
+  branding_mode: "bottom"
   android_12:
-    image: assets/logo.png
+#    image: assets/logo.png
     color: "#ffffff"
+    branding: "assets/logoo.png" # 这张图会被自动贴在屏幕最底部
+    branding_mode: "bottom"
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -110,3 +118,13 @@ flutter_native_splash:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+# ======== 新增：自动生成图标配置 ========
+flutter_launcher_icons:
+  android: true       # 允许覆盖 Android 图标
+#  ios: true           # 允许覆盖 iOS 图标
+  image_path: "assets/logo.png"  # 这是所有低版本安卓和苹果的基础图
+
+  # (可选推荐) Android 8.0 之后支持的“自适应图标(带圆形/圆角矩形遮罩)”
+  # 如果不配这下面两行，高版本安卓上图标可能会缩小在中间并带个白边
+  adaptive_icon_background: "#FFFFFF" # 纯色背景 (也可用另一张图，如 "assets/icon/bg.png")
+  adaptive_icon_foreground: "assets/logo.png" # 图标主体元素

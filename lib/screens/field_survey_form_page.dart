@@ -864,10 +864,22 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
       // ---- 生态地质垂直剖面测量记录表 专属初始化 (保留你原来写好的) ----
     } else if (widget.templateType == '3') {
       // ---- 林草调查表 专属初始化 ----
+      //灌木样方面积(㎡)
+      _formData.addAll({
+        // 初始化调查点独有的照片或组
+      });
     } else if (widget.templateType == '4') {
       // ---- 林草调查表 专属初始化 ----
+      _formData.addAll({
+        // 初始化调查点独有的照片或组
+        '灌木样方面积(㎡)':'25',
+      });
     } else if (widget.templateType == '5') {
       // ---- 林草调查表 专属初始化 ----
+      _formData.addAll({
+        // 初始化调查点独有的照片或组
+        '草木样方面积(㎡)':'1',
+      });
     }
   }
 
@@ -1781,7 +1793,24 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                 children: [
                   Row(
                     children: [
-                      Expanded(flex: 3, child: _buildAutoBox('植被类型')),
+                      // Expanded(flex: 3, child: _buildAutoBox('植被类型')),
+                      Expanded(
+                        flex: 3,
+                        child: _buildDropdown('植被类型', [
+                          '栽培植被',
+                          '针叶林',
+                          '阔叶林',
+                          '草甸',
+                          '沼泽',
+                          '灌丛',
+                          '针阔叶混交林',
+                          '草原',
+                          '高山植被',
+                          '无植被地段',
+                          '荒漠',
+                          '草丛',
+                        ]),
+                      ),
                       SizedBox(width: 8),
                       Expanded(flex: 3, child: _buildInput('植被覆盖度(%)')),
                     ],
@@ -1809,9 +1838,12 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                     children: [
                       Expanded(child: _buildAutoBox('土壤类型')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildAutoBox('侵蚀类型')),
+                      // todo 等待数据
+                      //Expanded(child: _buildAutoBox('侵蚀类型')),
+                      Expanded(child: _buildInput('侵蚀类型')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildAutoBox('侵蚀强度')),
+                      // Expanded(child: _buildAutoBox('侵蚀强度')),
+                      Expanded(child: _buildInput('侵蚀强度')),
                     ],
                   ),
                   Row(
@@ -2149,7 +2181,25 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                 children: [
                   Row(
                     children: [
-                      Expanded(flex: 3, child: _buildAutoBox('植被类型')),
+                      // todo 等待植被类型数据,先切换成下拉框
+                      // Expanded(flex: 3, child: _buildAutoBox('植被类型')),
+                      Expanded(
+                        flex: 3,
+                        child: _buildDropdown('植被类型', [
+                          '栽培植被',
+                          '针叶林',
+                          '阔叶林',
+                          '草甸',
+                          '沼泽',
+                          '灌丛',
+                          '针阔叶混交林',
+                          '草原',
+                          '高山植被',
+                          '无植被地段',
+                          '荒漠',
+                          '草丛',
+                        ]),
+                      ),
                       SizedBox(width: 8),
                       Expanded(flex: 3, child: _buildInput('植被覆盖度(%)')),
                     ],
@@ -2177,9 +2227,12 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
                     children: [
                       Expanded(child: _buildAutoBox('土壤类型')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildAutoBox('侵蚀类型')),
+                      // todo 等待数据
+                      //Expanded(child: _buildAutoBox('侵蚀类型')),
+                      Expanded(child: _buildInput('侵蚀类型')),
                       SizedBox(width: 8),
-                      Expanded(child: _buildAutoBox('侵蚀强度')),
+                      // Expanded(child: _buildAutoBox('侵蚀强度')),
+                      Expanded(child: _buildInput('侵蚀强度')),
                     ],
                   ),
                   Row(
@@ -2384,7 +2437,7 @@ class _FieldSurveyFormPageState extends State<FieldSurveyFormPage> {
             children: [
               Expanded(flex: 2, child: _buildAutoBox('样地号')),
               SizedBox(width: 8),
-              Expanded(child: _buildDropdown('样地面积(㎡)', ['20*20', '30*30'])),
+              Expanded(child: _buildDropdown('样地面积(㎡)', ['400', '900'])),
             ],
           ),
           Row(

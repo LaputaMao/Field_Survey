@@ -2154,8 +2154,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         clickedLatLngGcj,
                         gcjPoint,
                       );
-                      if (distance < 500 && distance < minDistance) {
-                        // 50米容差
+                      if (distance < 5000 && distance < minDistance) {
+                        // 5000米容差,缓冲区
                         minDistance = distance;
                         closestLine = taskLine;
                       }
